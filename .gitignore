@@ -4,7 +4,7 @@
 /*.tar.gz
 
 # Note: docs/apt/ is NOT ignored. That directory is the published APT
-# repository — the one place a built .deb is meant to be committed, because
+# repository, the one place a built .deb is meant to be committed, because
 # `apt install` downloads it from there.
 
 __pycache__/

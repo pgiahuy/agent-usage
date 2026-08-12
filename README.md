@@ -3,7 +3,7 @@
 Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
 spent, when it resets, and how many tokens went out today and over the week.
 
-Percentages are **consumed**, from each provider's own API — not an estimate
+Percentages are **consumed**, from each provider's own API, not an estimate
 derived from the logs. Token counts come from the local session logs, so they
 keep working when a quota endpoint does not.
 
@@ -18,7 +18,7 @@ Bars turn amber at 75% consumed and red at 90%.
 ## Requirements
 
 - GNOME Shell 48 or newer for the panel indicator (developed and tested on 50)
-- Python 3.8+ — standard library only
+- Python 3.8+, standard library only
 - systemd user session (optional: without it, run the collector yourself)
 - Claude Code and/or Kimi Code signed in. Neither is required; a tool that is
   not installed simply does not get a block.
@@ -30,9 +30,9 @@ The terminal view (`ai-usage`) works anywhere, GNOME or not.
 There is nothing to configure and no API key to paste. The collector reads the
 token each tool already wrote when you signed in to it:
 
-- `~/.claude/.credentials.json` — Claude Code refreshes this as you use it, so
+- `~/.claude/.credentials.json`: Claude Code refreshes this as you use it, so
   it is normally valid and the Claude bars are always there.
-- `~/.kimi-code/credentials/kimi-code.json` — Kimi's access token lives 15
+- `~/.kimi-code/credentials/kimi-code.json`: Kimi's access token lives 15
   minutes, so the Kimi bars appear only if you have run `kimi` recently. The
   collector deliberately does not refresh it: rotating the refresh token could
   invalidate the one Kimi Code itself holds.
@@ -50,7 +50,7 @@ KIMI_CODE_HOME=/data/kimi-code
 ```
 
 Signing in to Claude Code with an API key rather than a subscription leaves no
-OAuth token behind, so that tool gets no quota bars — the quota endpoint
+OAuth token behind, so that tool gets no quota bars, because the quota endpoint
 measures a plan, and an API key is not one.
 
 ## Install
@@ -67,7 +67,7 @@ install cannot appear before that. The installer says so when it applies.
 Re-running `./install.sh` is also the upgrade path; after an upgrade the
 extension reloads with `gnome-extensions disable ai-usage@local && gnome-extensions enable ai-usage@local`.
 
-Everything lands under `$HOME` — no root, no system packages:
+Everything lands under `$HOME`, with no root and no system packages:
 
 ```
 ~/.local/share/ai-usage/                            collector
@@ -98,7 +98,7 @@ Two things stay per-user, because they are per-user by nature:
 gnome-extensions enable ai-usage@local   # once per user, after one logout
 ```
 
-Do not run `install.sh` as well — you would end up with two copies, one in
+Do not run `install.sh` as well, or you end up with two copies, one in
 `/usr` and one in `$HOME`, and the `$HOME` one wins on `PATH`.
 
 Removal is `sudo apt remove ai-usage`. That leaves each user's
@@ -106,8 +106,8 @@ Removal is `sudo apt remove ai-usage`. That leaves each user's
 
 ### `apt install ai-usage`, from your own repository
 
-For plain `apt install ai-usage` — and `apt upgrade` picking up new versions
-along with everything else — the package has to live in a repository the
+For plain `apt install ai-usage`, and `apt upgrade` picking up new versions
+along with everything else, the package has to live in a repository the
 machine trusts. `build-apt-repo.sh` builds one into `docs/apt/`, which GitHub
 Pages can serve directly from the `main` branch (Settings → Pages → Source:
 main, folder `/docs`).
@@ -171,7 +171,7 @@ $ ai-usage --tray     # AppIndicator fallback, needs PyGObject
 
 Two pieces, on purpose:
 
-- **The collector** (`daemon.py`) does all the work — parses the logs, calls
+- **The collector** (`daemon.py`) does all the work: it parses the logs, calls
   the quota endpoints, renders the ring icons, and writes one small JSON file
   to `~/.cache/ai-usage/state.json`.
 - **The extension** only reads that file and draws it. The compositor never
@@ -202,7 +202,7 @@ The collector reads, locally:
 - `~/.claude/projects/**/*.jsonl` and `~/.kimi-code/sessions/**/wire.jsonl`,
   for token counts.
 
-It talks to exactly two hosts — `api.anthropic.com` and `api.kimi.com` — and
+It talks to exactly two hosts, `api.anthropic.com` and `api.kimi.com`, and
 writes only inside `~/.cache/ai-usage`. Nothing is sent anywhere else, and no
 telemetry is collected.
 
@@ -264,4 +264,4 @@ names carry the revision number.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

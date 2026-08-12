@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Ring gauge rendered as an SVG tray icon.
 
-The arc tracks Claude's 5-hour window — the number that actually moves during a
-working session — and takes its colour from that window's severity. A dual-ring
+The arc tracks Claude's 5-hour window, the number that actually moves during a
+working session, and takes its colour from that window's severity. A dual-ring
 version was tried first and rejected: at the 16-22px the panel actually renders,
 two concentric arcs smear into one blob. The weekly figure lives in the text
 label instead, where it stays readable.
@@ -64,7 +64,7 @@ def ring_svg(percent, colour, known=True, accent=None):
         % (CENTER, CENTER, RADIUS, TRACK, WIDTH, TRACK_OPACITY)
     ]
     if not known:
-        # Distinguish "no reading" from "0% used" — an empty track would
+        # Distinguish "no reading" from "0% used": an empty track would
         # otherwise read as plenty of quota left. In the tool's own colour, so
         # the mark reads as that tool's badge and not as a dimmed gauge.
         parts.append(

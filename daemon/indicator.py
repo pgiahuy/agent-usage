@@ -2,7 +2,7 @@
 """GNOME top-bar indicator for Claude Code + Kimi Code usage.
 
 Panel: a ring gauge of Claude's 5-hour window, coloured by severity, plus a
-short label. Click it for the full breakdown — quota bars with reset times, and
+short label. Click it for the full breakdown: quota bars with reset times, and
 tokens spent today / over the last 7 days for both tools, split by model.
 
 Run:  ai-usage --tray        (normally started by systemctl --user)
@@ -42,7 +42,7 @@ APP_ID = "ai-usage"
 FALLBACK_ICON = "utilities-system-monitor-symbolic"
 LABEL_GUIDE = "100% · wk 100% · K 000M"
 LOCAL_REFRESH_S = 20  # rescan logs (near-free once offsets are warm)
-QUOTA_REFRESH_S = 300  # hit the quota APIs (endpoint is rate limited — go easy)
+QUOTA_REFRESH_S = 300  # hit the quota APIs (endpoint is rate limited, go easy)
 
 class Indicator:
     def __init__(self):
@@ -89,7 +89,7 @@ class Indicator:
         self._render()
 
     def refresh_quota(self, force=False):
-        """Network calls go to a worker thread — never block the GTK main loop."""
+        """Network calls go to a worker thread; never block the GTK main loop."""
         if self._fetching:
             return
         self._fetching = True

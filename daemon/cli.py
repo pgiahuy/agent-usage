@@ -58,7 +58,7 @@ def _quota_rows(st, q):
         print("   " + st(DIM, "quota unavailable (%s)" % q.get("why", "unknown")))
         return
     if not q.get("ok"):
-        print("   " + st(DIM, "quota unavailable (%s) — showing last known" % q.get("why")))
+        print("   " + st(DIM, "quota unavailable (%s), showing last known" % q.get("why")))
     for lim in limits:
         pct = lim["percent"] or 0
         reset = core.fmt_reset(lim["resets_at"])

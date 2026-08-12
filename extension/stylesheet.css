@@ -8,7 +8,7 @@
      - the margin, because a panel button is as tall as the panel and its
        background ignores padding, so without it the pill is a 32px lozenge.
    Doubling the class with .panel-button outranks the shell theme's own rules.
-   Note a dead end: `.ai-usage-panel-button:hover .ai-usage-pill` does nothing —
+   Note a dead end: `.ai-usage-panel-button:hover .ai-usage-pill` does nothing;
    St does not match a descendant against an ancestor's pseudo-class. */
 .panel-button.ai-usage-panel-button {
   -natural-hpadding: 0;
@@ -94,7 +94,7 @@
   font-size: 10.5px;
   font-weight: 700;
   /* The design's .14em tracking is applied in ui-<n>.js, by spacing the
-     characters out in the string — St has no letter-spacing property. */
+     characters out in the string, because St has no letter-spacing property. */
 }
 
 .ai-usage-refresh {
@@ -118,7 +118,7 @@
 /* Tiles ------------------------------------------------------------------ */
 
 /* One tile per limit. The raised surface is the only thing separating two
-   limits here — no rules, no blank bands — so keep the contrast. */
+   limits here (no rules, no blank bands), so keep the contrast. */
 .ai-usage-tile {
   margin-top: 6px;
   padding: 8px 10px 9px 10px;
@@ -164,7 +164,7 @@
 }
 
 .ai-usage-track {
-  /* 272px card − 2×10px tile padding − 2×1px border. Must match TRACK_W. */
+  /* 272px card - 2x10px tile padding - 2x1px border. Must match TRACK_W. */
   width: 250px;
   height: 5px;
   border-radius: 999px;
@@ -183,9 +183,9 @@
 }
 
 .ai-usage-duo-tile {
-  /* St's width is the CONTENT width — padding and border are added outside it.
+  /* St's width is the CONTENT width: padding and border are added outside it.
      133px each would allocate 155px and push the second tile off the card:
-     (272 − 6px spacing) / 2 = 133 outer, minus 2×10 padding and 2×1 border. */
+     (272 - 6px spacing) / 2 = 133 outer, minus 2x10 padding and 2x1 border. */
   width: 111px;
 }
 

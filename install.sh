@@ -34,7 +34,7 @@ say() { printf '  %s\n' "$*"; }
 # --- python ---------------------------------------------------------------
 # The collector is standard library only, so any python3 will run it. The
 # optional --tray fallback needs PyGObject, which on most distributions only
-# the system interpreter has — a pyenv or conda python will not do. Prefer an
+# the system interpreter has: a pyenv or conda python will not do. Prefer an
 # interpreter that has it, and fall back to whatever is on PATH.
 pick_python() {
   local best=""
@@ -69,7 +69,7 @@ if command -v gnome-shell >/dev/null 2>&1; then
     say "         the 'ai-usage' terminal view work on any version."
   fi
 else
-  say "gnome shell: not found — installing the collector and CLI only"
+  say "gnome shell: not found, installing the collector and CLI only"
 fi
 
 # --- collector ------------------------------------------------------------
@@ -112,10 +112,10 @@ fi
 # --- enabling the extension ----------------------------------------------
 # GNOME Shell scans the extensions directory once, at startup, and caches every
 # module it imports for the life of the process. A brand new extension is
-# therefore invisible until the session restarts — there is no reload D-Bus
+# therefore invisible until the session restarts: there is no reload D-Bus
 # call any more.
 # `gnome-extensions enable` refuses a uuid the running shell has never heard
-# of, but the setting it writes is just a list in dconf — and the shell reads
+# of, but the setting it writes is just a list in dconf, and the shell reads
 # that list at startup, after it has scanned the directory. Writing it
 # ourselves means the extension is already on at the next login, instead of
 # needing a second command afterwards.
@@ -137,10 +137,10 @@ if command -v gnome-extensions >/dev/null 2>&1 && gnome-extensions info "$UUID" 
   echo "Done. The panel indicator is enabled."
   echo "If it does not appear, log out and back in once."
 elif enable_in_dconf; then
-  echo "Done. Log out and back in once — the indicator comes up with the session."
+  echo "Done. Log out and back in once; the indicator comes up with the session."
   echo "(GNOME Shell only looks for new extensions when the session starts.)"
 else
-  echo "Done — except for one step this script could not do:"
+  echo "Done, except for one step this script could not do:"
   echo
   echo "  log out and back in, then run:  gnome-extensions enable $UUID"
 fi

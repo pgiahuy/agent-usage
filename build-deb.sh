@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build dist/ai-usage_<version>_all.deb — a system-wide install of the same
+# Build dist/ai-usage_<version>_all.deb: a system-wide install of the same
 # files install.sh puts in $HOME.
 #
 # The split matters: a .deb owns /usr, but a GNOME extension and a systemd user

@@ -4,7 +4,7 @@
 Superseded by the GNOME Shell extension, which can actually draw. This path
 survives only as a stopgap, and it carries a hard constraint: GNOME serialises
 AppIndicator menus over DBusMenu, which transports plain text. Every span,
-weight and monospace hint below is stripped before it reaches the panel — so
+weight and monospace hint below is stripped before it reaches the panel, so
 nothing here may depend on colour to be readable.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ import usage_core as core
 DIM = "#8b8b8b"
 LABEL_W = 15  # width of the leading name column, in monospace cells
 
-# The unfilled part of a bar is the same block as the filled part, faded — the
+# The unfilled part of a bar is the same block as the filled part, faded: the
 # same track-plus-arc reading as the ring icon. Matches ring.TRACK_OPACITY.
 TRACK_ALPHA = "38%"
 
@@ -53,7 +53,7 @@ def _quota_rows(quota, tool):
         ]
     if not live:
         rows.append(
-            (coloured("<i>quota unavailable (%s) — last known</i>" % esc(q.get("why")), DIM), 1)
+            (coloured("<i>quota unavailable (%s), showing last known</i>" % esc(q.get("why")), DIM), 1)
         )
     for lim in limits:
         pct = lim["percent"] or 0

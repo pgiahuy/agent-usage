@@ -1,13 +1,13 @@
 /* The AI Usage panel UI: every limit is its own raised tile, with the token
  * counts as two tiles side by side underneath.
  *
- * Loaded by extension.js, which always imports the highest-numbered ui-<n>.js —
- * read the comment there before editing this file in place: an edit here only
+ * Loaded by extension.js, which always imports the highest-numbered ui-<n>.js.
+ * Read the comment there before editing this file in place: an edit here only
  * lands on a logout, whereas a copy at the next number lands on disable/enable.
  *
  * The percentages are CONSUMED, the same direction as the panel's ring and the
  * colour tiers in ring.py: a full bar and a high number both mean trouble.
- * Showing what is left instead was tried and dropped — it read the opposite way
+ * Showing what is left instead was tried and dropped: it read the opposite way
  * from the same bar, and disagreed with the ring sitting next to it.
  */
 
@@ -22,20 +22,20 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-// Two revisions of this file can be live in one process — the previous one is
-// still registered when a newer one loads — so GTypes have to be named apart.
+// Two revisions of this file can be live in one process, because the previous
+// one is still registered when a newer one loads, so GTypes have to be named apart.
 const REV = /ui-(\d+)\.js$/.exec(import.meta.url)?.[1] ?? '0';
 
 const CACHE_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'ai-usage']);
 const STATE_PATH = GLib.build_filenamev([CACHE_DIR, 'state.json']);
 const REFRESH_TRIGGER = GLib.build_filenamev([CACHE_DIR, 'refresh-request']);
 
-// 272px card − 2×10px tile padding − 2×1px tile border. The track cannot just
+// 272px card - 2x10px tile padding - 2x1px tile border. The track cannot just
 // x_expand: the fill inside it is sized in px, so the track has to be a known
 // width for the two to agree.
 const TRACK_W = 250;
-const MIN_FILL = 3;   // px — any usage at all should stay visible
-const DUO_W = 133;    // (272 − 6px spacing) / 2
+const MIN_FILL = 3;   // px, so that any usage at all stays visible
+const DUO_W = 133;    // (272 - 6px spacing) / 2
 const RING_SIZE = 20;
 // Refresh spinner: 20° every 33ms is a turn every 0.6s at about 30fps. Faster
 // than that on a 14px glyph stops reading as rotation and just looks like
@@ -43,7 +43,7 @@ const RING_SIZE = 20;
 const SPIN_MS = 33;
 const SPIN_STEP = 20;
 // The daemon does the actual work, so the spin ends when it writes a new
-// state file. If it is not running, nothing will ever arrive — stop anyway.
+// state file. If it is not running, nothing will ever arrive, so stop anyway.
 const SPIN_CAP_S = 12;
 const POLL_SECONDS = 60; // safety net behind the file monitor
 
@@ -71,7 +71,7 @@ class Pill extends St.BoxLayout {
                 slot.iconPath = tool.icon;
                 slot.icon.gicon = Gio.FileIcon.new(Gio.File.new_for_path(tool.icon));
             }
-            slot.label.text = tool.badge ?? '—';
+            slot.label.text = tool.badge ?? 'n/a';
             slot.label.style = `color: ${tool.accent};`;
         });
     }
@@ -260,7 +260,7 @@ class Indicator extends PanelMenu.Button {
         const tools = this._state?.tools ?? [];
 
         if (!tools.length) {
-            this._pill.update([{accent: '#8b90a0', badge: '—', icon: null}]);
+            this._pill.update([{accent: '#8b90a0', badge: 'n/a', icon: null}]);
             this._body.add_child(new St.Label({
                 style_class: 'ai-usage-note',
                 text: 'ai-usage daemon is not running.\nsystemctl --user start ai-usage',
@@ -294,7 +294,7 @@ class Indicator extends PanelMenu.Button {
 
             if (tool.limits.length) {
                 if (tool.stale)
-                    block.add_child(noteRow(`last known — ${tool.why ?? 'not reachable'}`));
+                    block.add_child(noteRow(`last known: ${tool.why ?? 'not reachable'}`));
                 for (const limit of tool.limits)
                     block.add_child(limitTile(limit));
             } else {

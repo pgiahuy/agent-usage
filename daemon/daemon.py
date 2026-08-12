@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Headless collector: keep ~/.cache/ai-usage/state.json current.
 
-The GNOME Shell extension is pure presentation — it reads this file and draws.
+The GNOME Shell extension is pure presentation: it reads this file and draws.
 Keeping the log parsing and the quota calls here means the shell process never
 touches 400 MB of jsonl, and the numbers stay in the one place they have been
 verified.
@@ -101,7 +101,7 @@ def _tool_state(name, side, quota, tag):
         "why": why,
         "icon": icon,
         # What the panel shows next to the ring: the 5-hour percent when we have
-        # it, otherwise today's token volume — never a fabricated percentage.
+        # it, otherwise today's token volume, never a fabricated percentage.
         "badge": ("%d%%" % session["percent"]) if session else core.fmt_tokens(
             core.total_tokens(side["today"]["total"])
         ),

@@ -1,4 +1,4 @@
-/* AI Usage — Claude Code + Kimi Code usage in the GNOME top bar.
+/* AI Usage: Claude Code and Kimi Code usage in the GNOME top bar.
  *
  * This file is a loader and nothing else. Do not put UI in it.
  *
@@ -8,7 +8,7 @@
  * the highest-numbered one it finds, which is a URI the process has not seen,
  * so a plain `gnome-extensions disable/enable` really does load new code.
  *
- * Ship a UI change by writing ui-<n+1>.js. Stylesheets need no such trick —
+ * Ship a UI change by writing ui-<n+1>.js. Stylesheets need no such trick:
  * the shell reloads stylesheet.css on every enable.
  *
  * Everything else about this extension is presentation only: all parsing and

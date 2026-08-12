@@ -7,7 +7,7 @@ Two sources:
       Kimi    ~/.kimi-code/sessions/*/*/agents/*/wire.jsonl  (type=usage.record, scope=turn)
   - Provider quota APIs, for percent of plan consumed and reset times:
       Claude  GET https://api.anthropic.com/api/oauth/usage  (the endpoint /usage itself calls)
-      Kimi    GET https://api.kimi.com/coding/v1/…           (path discovered — see _kimi_probe)
+      Kimi    GET https://api.kimi.com/coding/v1/…           (path discovered, see _kimi_probe)
 
 The scanner keeps byte offsets in memory, so the first sweep costs about a
 second and every later one is effectively free. Nothing is cached to disk, so
@@ -455,7 +455,7 @@ _NAME_KEYS = ("label", "name", "kind", "type", "window", "period", "scope", "id"
 
 
 def _num(node, keys):
-    """First of `keys` that holds a number — including one written as a string.
+    """First of `keys` that holds a number, including one written as a string.
 
     Kimi sends every quota figure as a string ("limit": "100"), which is why an
     is-a-number test alone finds nothing in its payload.
@@ -632,7 +632,7 @@ def kimi_quota(timeout=8, fresh_for=QUOTA_FRESH_S):
 
     Kimi Code's access token lives 15 minutes, so outside an active kimi session
     it is usually expired and this says so rather than guessing. Nothing is
-    refreshed here — rotating the refresh token could break kimi's own login."""
+    refreshed here: rotating the refresh token could break kimi's own login."""
     cached = _cache_read_versioned("kimi-quota.json")
     if cached and time.time() - cached.get("fetched_at", 0) < fresh_for:
         return dict(cached, from_cache=True)
@@ -753,7 +753,7 @@ def bar(percent, width=10, empty_char="█"):
     track. Callers that cannot rely on colour surviving (a terminal being piped
     to a file) should pass a visually distinct empty_char instead.
 
-    Truncating rather than rounding keeps a full bar honest — only a true 100%
+    Truncating rather than rounding keeps a full bar honest: only a true 100%
     fills every cell.
     """
     p = max(0, min(100, int(percent or 0)))
