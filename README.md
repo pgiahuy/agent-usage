@@ -39,6 +39,16 @@ token each tool already wrote when you signed in to it:
 
 Token counts come from the session logs and are there either way.
 
+Both tools can be pointed at a different directory, and the collector follows
+them: `CLAUDE_CONFIG_DIR` for Claude Code, `KIMI_CODE_HOME` for Kimi Code. A
+systemd user service does not inherit your shell's environment, so set those
+in `~/.config/environment.d/ai-usage.conf` rather than in `.bashrc`:
+
+```
+CLAUDE_CONFIG_DIR=/data/claude
+KIMI_CODE_HOME=/data/kimi-code
+```
+
 Signing in to Claude Code with an API key rather than a subscription leaves no
 OAuth token behind, so that tool gets no quota bars — the quota endpoint
 measures a plan, and an API key is not one.

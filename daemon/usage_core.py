@@ -25,10 +25,25 @@ import urllib.request
 from datetime import date, datetime, timedelta
 
 HOME = os.path.expanduser("~")
-CLAUDE_GLOB = os.path.join(HOME, ".claude", "projects", "**", "*.jsonl")
-CLAUDE_CREDS = os.path.join(HOME, ".claude", ".credentials.json")
-KIMI_GLOB = os.path.join(HOME, ".kimi-code", "sessions", "*", "*", "agents", "*", "wire.jsonl")
-KIMI_CREDS = os.path.join(HOME, ".kimi-code", "credentials", "kimi-code.json")
+
+
+def _tool_home(env_var, default_name):
+    """Where a tool keeps its data. Neither location is ours to assume: Claude
+    Code moves with CLAUDE_CONFIG_DIR and Kimi Code with KIMI_CODE_HOME, and a
+    user who has set either would otherwise just see an empty panel."""
+    override = os.environ.get(env_var)
+    if override:
+        return os.path.abspath(os.path.expanduser(override))
+    return os.path.join(HOME, default_name)
+
+
+CLAUDE_HOME = _tool_home("CLAUDE_CONFIG_DIR", ".claude")
+KIMI_HOME = _tool_home("KIMI_CODE_HOME", ".kimi-code")
+
+CLAUDE_GLOB = os.path.join(CLAUDE_HOME, "projects", "**", "*.jsonl")
+CLAUDE_CREDS = os.path.join(CLAUDE_HOME, ".credentials.json")
+KIMI_GLOB = os.path.join(KIMI_HOME, "sessions", "*", "*", "agents", "*", "wire.jsonl")
+KIMI_CREDS = os.path.join(KIMI_HOME, "credentials", "kimi-code.json")
 
 CACHE_DIR = os.path.join(
     os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "ai-usage"
