@@ -25,6 +25,24 @@ Bars turn amber at 75% consumed and red at 90%.
 
 The terminal view (`ai-usage`) works anywhere, GNOME or not.
 
+## Signing in
+
+There is nothing to configure and no API key to paste. The collector reads the
+token each tool already wrote when you signed in to it:
+
+- `~/.claude/.credentials.json` — Claude Code refreshes this as you use it, so
+  it is normally valid and the Claude bars are always there.
+- `~/.kimi-code/credentials/kimi-code.json` — Kimi's access token lives 15
+  minutes, so the Kimi bars appear only if you have run `kimi` recently. The
+  collector deliberately does not refresh it: rotating the refresh token could
+  invalidate the one Kimi Code itself holds.
+
+Token counts come from the session logs and are there either way.
+
+Signing in to Claude Code with an API key rather than a subscription leaves no
+OAuth token behind, so that tool gets no quota bars — the quota endpoint
+measures a plan, and an API key is not one.
+
 ## Install
 
 ```sh
