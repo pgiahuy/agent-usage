@@ -1,0 +1,212 @@
+/* Panel pill ------------------------------------------------------------- */
+
+/* The pill is painted on the panel button itself, not on the box inside it.
+   The button is what takes the hover, and the shell gives it a horizontal
+   padding of its own, so a skin on the child leaves the highlight as a wide
+   rounded rectangle around a narrower pill. Two things were needed:
+     - the hpadding zeroed, or the button stays wider than its contents;
+     - the margin, because a panel button is as tall as the panel and its
+       background ignores padding, so without it the pill is a 32px lozenge.
+   Doubling the class with .panel-button outranks the shell theme's own rules.
+   Note a dead end: `.ai-usage-panel-button:hover .ai-usage-pill` does nothing —
+   St does not match a descendant against an ancestor's pseudo-class. */
+.panel-button.ai-usage-panel-button {
+  -natural-hpadding: 0;
+  -minimum-hpadding: 0;
+  padding: 0 10px 0 6px;
+  margin: 5px 0;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* One rule per state, not one selector list: St drops a whole list if any
+   selector in it fails to parse, and a silent drop is hard to spot.
+   :active is the menu-open state on a panel button, not a press. */
+.panel-button.ai-usage-panel-button:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.panel-button.ai-usage-panel-button:focus {
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.panel-button.ai-usage-panel-button:active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.panel-button.ai-usage-panel-button:checked {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.ai-usage-pill {
+  spacing: 8px;
+}
+
+.ai-usage-mini {
+  spacing: 5px;
+}
+
+.ai-usage-pill-sep {
+  width: 1px;
+  min-width: 1px;
+  margin: 4px 0;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.ai-usage-badge {
+  font-size: 12px;
+  font-weight: 650;
+  font-feature-settings: "tnum";
+}
+
+/* Popup card ------------------------------------------------------------- */
+
+.ai-usage-card {
+  width: 272px;
+  spacing: 12px;
+  padding: 2px 0;
+}
+
+.ai-usage-tool-next {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-usage-head {
+  spacing: 7px;
+  /* Fixed, because only the first block carries the refresh button: without a
+     set height that block's header would be 12px taller than the other one. */
+  height: 26px;
+}
+
+.ai-usage-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.ai-usage-tool-name {
+  font-size: 10.5px;
+  font-weight: 700;
+  /* The design's .14em tracking is applied in ui-<n>.js, by spacing the
+     characters out in the string — St has no letter-spacing property. */
+}
+
+.ai-usage-refresh {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid transparent;
+}
+
+.ai-usage-refresh:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: #eceef4;
+}
+
+.ai-usage-refresh:focus {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Tiles ------------------------------------------------------------------ */
+
+/* One tile per limit. The raised surface is the only thing separating two
+   limits here — no rules, no blank bands — so keep the contrast. */
+.ai-usage-tile {
+  margin-top: 6px;
+  padding: 8px 10px 9px 10px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ai-usage-trow {
+  spacing: 7px;
+  padding-bottom: 7px;
+}
+
+.ai-usage-row-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cfd3dd;
+}
+
+.ai-usage-when {
+  font-size: 9.5px;
+  color: #7c8191;
+}
+
+/* The number and its unit are one word, so they get their own box: the row's
+   7px spacing would otherwise open a gap between them. */
+.ai-usage-pct-box {
+  spacing: 1px;
+}
+
+.ai-usage-pct {
+  font-size: 15px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+/* Its own label rather than inline markup, and nudged up off the baseline so
+   it sits with the number instead of hanging below it. */
+.ai-usage-pct-unit {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding-bottom: 2px;
+}
+
+.ai-usage-track {
+  /* 272px card − 2×10px tile padding − 2×1px border. Must match TRACK_W. */
+  width: 250px;
+  height: 5px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.ai-usage-fill {
+  height: 5px;
+  border-radius: 999px;
+}
+
+/* Token counts: same tile, two across. */
+
+.ai-usage-duo {
+  spacing: 6px;
+}
+
+.ai-usage-duo-tile {
+  /* St's width is the CONTENT width — padding and border are added outside it.
+     133px each would allocate 155px and push the second tile off the card:
+     (272 − 6px spacing) / 2 = 133 outer, minus 2×10 padding and 2×1 border. */
+  width: 111px;
+}
+
+.ai-usage-stat-k {
+  font-size: 9.5px;
+  color: #8b90a0;
+  font-feature-settings: "tnum";
+}
+
+.ai-usage-stat-v {
+  font-size: 13px;
+  font-weight: 650;
+  color: #eceef4;
+  font-feature-settings: "tnum";
+}
+
+.ai-usage-note-row {
+  padding: 4px 2px 0 2px;
+}
+
+.ai-usage-note {
+  font-size: 10.5px;
+  color: #8b90a0;
+}

@@ -1,0 +1,16 @@
+# Build output. The .deb is rebuilt by ./build-deb.sh from the tracked sources,
+# so committing it would only be a binary that goes stale.
+/dist/
+/*.tar.gz
+
+# Note: docs/apt/ is NOT ignored. That directory is the published APT
+# repository — the one place a built .deb is meant to be committed, because
+# `apt install` downloads it from there.
+
+__pycache__/
+*.pyc
+
+# Editors
+*.swp
+.vscode/
+.idea/

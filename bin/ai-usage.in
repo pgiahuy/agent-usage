@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# ai-usage            print the Claude + Kimi usage table in the terminal
+# ai-usage --json     the same reading as JSON
+# ai-usage --daemon   background collector; writes ~/.cache/ai-usage/state.json
+#                     for the GNOME extension to draw (normally run by systemd)
+# ai-usage --tray     AppIndicator fallback for sessions without the extension
+#
+# @PYTHON@ and @APP_DIR@ are filled in by install.sh.
+set -euo pipefail
+APP="@APP_DIR@"
+PY="@PYTHON@"
+
+case "${1:-}" in
+  --daemon) shift; exec "$PY" "$APP/daemon.py" "$@" ;;
+  --tray)   shift; exec "$PY" "$APP/indicator.py" "$@" ;;
+esac
+exec "$PY" "$APP/cli.py" "$@"
