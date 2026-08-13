@@ -2,7 +2,7 @@
 # Remove everything install.sh put in place.
 set -euo pipefail
 
-UUID=ai-usage@local
+UUID=ai-usage@pgiahuy.github.io
 DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}

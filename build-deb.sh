@@ -15,7 +15,7 @@ VERSION=${VERSION:-1.0.0}
 # Whoever builds the package owns it. Override with the real address before
 # handing the .deb to anyone: MAINTAINER="You <you@example.com>" ./build-deb.sh
 MAINTAINER=${MAINTAINER:-"ai-usage contributors <ai-usage@users.noreply.github.com>"}
-UUID=ai-usage@local
+UUID=ai-usage@pgiahuy.github.io
 SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 STAGE=$(mktemp -d)
 chmod 755 "$STAGE"
@@ -88,7 +88,7 @@ ai-usage installed.
 
 Each user turns the panel indicator on for their own session:
 
-    gnome-extensions enable ai-usage@local
+    gnome-extensions enable ai-usage@pgiahuy.github.io
 
 A running GNOME session will not see a newly installed extension until the
 user logs out and back in. Without GNOME, "ai-usage" still prints the table.

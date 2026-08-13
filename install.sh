@@ -3,7 +3,7 @@
 # $HOME. Re-running it is the upgrade path.
 set -euo pipefail
 
-UUID=ai-usage@local
+UUID=ai-usage@pgiahuy.github.io
 SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}

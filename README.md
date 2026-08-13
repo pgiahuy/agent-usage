@@ -65,14 +65,14 @@ when the session starts, and there is no reload call any more, so a fresh
 install cannot appear before that. The installer says so when it applies.
 
 Re-running `./install.sh` is also the upgrade path; after an upgrade the
-extension reloads with `gnome-extensions disable ai-usage@local && gnome-extensions enable ai-usage@local`.
+extension reloads with `gnome-extensions disable ai-usage@pgiahuy.github.io && gnome-extensions enable ai-usage@pgiahuy.github.io`.
 
 Everything lands under `$HOME`, with no root and no system packages:
 
 ```
 ~/.local/share/ai-usage/                            collector
 ~/.local/bin/ai-usage                               command
-~/.local/share/gnome-shell/extensions/ai-usage@local/   extension
+~/.local/share/gnome-shell/extensions/ai-usage@pgiahuy.github.io/   extension
 ~/.config/systemd/user/ai-usage.service             service
 ~/.cache/ai-usage/                                  readings, ring icons
 ```
@@ -95,7 +95,7 @@ ai-usage.service`, so every user's session starts the collector at login.
 Two things stay per-user, because they are per-user by nature:
 
 ```sh
-gnome-extensions enable ai-usage@local   # once per user, after one logout
+gnome-extensions enable ai-usage@pgiahuy.github.io   # once per user, after one logout
 ```
 
 Do not run `install.sh` as well, or you end up with two copies, one in
@@ -228,7 +228,7 @@ After editing a Python file: `systemctl --user restart ai-usage`.
 ## Troubleshooting
 
 **Nothing in the panel.** The extension needs one logout after the first
-install. Then `gnome-extensions info ai-usage@local` should say ACTIVE, and
+install. Then `gnome-extensions info ai-usage@pgiahuy.github.io` should say ACTIVE, and
 `journalctl --user -u org.gnome.Shell@wayland -n 50` shows any load error.
 
 **"ai-usage daemon is not running".** `systemctl --user status ai-usage`, and
@@ -253,9 +253,9 @@ the way to ship a UI change to a running session is to copy the file to the
 next number and toggle the extension:
 
 ```sh
-cd ~/.local/share/gnome-shell/extensions/ai-usage@local
+cd ~/.local/share/gnome-shell/extensions/ai-usage@pgiahuy.github.io
 cp ui-1.js ui-2.js && $EDITOR ui-2.js
-gnome-extensions disable ai-usage@local && gnome-extensions enable ai-usage@local
+gnome-extensions disable ai-usage@pgiahuy.github.io && gnome-extensions enable ai-usage@pgiahuy.github.io
 ```
 
 `stylesheet.css` is re-read on every enable, so CSS-only changes need no copy.
