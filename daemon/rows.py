@@ -32,10 +32,8 @@ def coloured(markup, colour):
 
 def tool_limits(quota, tool="claude"):
     """Live limits, or the last known set when the API is unreachable."""
-    q = quota.get(tool, {})
-    if q.get("ok"):
-        return q.get("limits") or [], True
-    return ((q.get("cached") or {}).get("limits") or []), False
+    limits, live, _why = core.live_limits(quota.get(tool, {}))
+    return limits, live
 
 
 def session_limit(quota):
@@ -147,7 +145,7 @@ def build(local, quota):
 def panel_label(local, quota):
     parts = []
     session, live = session_limit(quota)
-    limits, _ = claude_limits(quota)
+    limits, _ = tool_limits(quota)
     if session:
         parts.append("%d%%%s" % (session["percent"] or 0, "" if live else "?"))
         week = next((l for l in limits if l["label"] == "Weekly"), None)

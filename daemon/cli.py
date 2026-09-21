@@ -53,12 +53,12 @@ def print_report(snap, st):
 
 
 def _quota_rows(st, q):
-    limits = q.get("limits") if q.get("ok") else (q.get("cached") or {}).get("limits") or []
+    limits, live, why = core.live_limits(q)
     if not limits:
-        print("   " + st(DIM, "quota unavailable (%s)" % q.get("why", "unknown")))
+        print("   " + st(DIM, "quota unavailable (%s)" % (why or "unknown")))
         return
-    if not q.get("ok"):
-        print("   " + st(DIM, "quota unavailable (%s), showing last known" % q.get("why")))
+    if not live:
+        print("   " + st(DIM, "quota unavailable (%s), showing last known" % why))
     for lim in limits:
         pct = lim["percent"] or 0
         reset = core.fmt_reset(lim["resets_at"])

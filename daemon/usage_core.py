@@ -675,6 +675,38 @@ def kimi_quota(timeout=8, fresh_for=QUOTA_FRESH_S):
     return out
 
 
+def _reset_passed(iso, now=None):
+    """True once a reset stamp has gone by.
+
+    A stamp with no timezone is read as local, the same way fmt_reset reads it.
+    """
+    if not iso:
+        return False
+    try:
+        dt = datetime.fromisoformat(iso)
+    except ValueError:
+        return False
+    if dt.tzinfo is None:
+        dt = dt.astimezone()
+    return dt.timestamp() <= (time.time() if now is None else now)
+
+
+def live_limits(quota):
+    """(limits, live, why) for one tool's reading.
+
+    A cached reading outlives the window it measured. Once its reset time has
+    gone by the window has rolled over, so the old percentage describes a
+    period that no longer exists and is dropped. Dropped rather than zeroed:
+    what the new window holds is unknown until a fetch succeeds, and this tool
+    does not show a number it has not been told.
+    """
+    if quota.get("ok"):
+        return quota.get("limits") or [], True, None
+    cached = (quota.get("cached") or {}).get("limits") or []
+    kept = [lim for lim in cached if not _reset_passed(lim.get("resets_at"))]
+    return kept, False, quota.get("why")
+
+
 # --------------------------------------------------------------------------
 
 

@@ -63,16 +63,26 @@ def _models(side):
     ]
 
 
-def _limits_from_quota(q):
-    """Normalised limit rows plus whether the reading is live or last-known."""
-    if q.get("ok"):
-        return q.get("limits") or [], True, None
-    cached = (q.get("cached") or {}).get("limits") or []
-    return cached, False, q.get("why")
+def _fetch_quota(fresh_for=None):
+    """Both providers, never raising.
+
+    An unexpected error escaping here would end the process, and the unit is
+    Restart=always, so the daemon would respawn every RestartSec for as long as
+    the cause lasted. The reason goes to the journal in full; the panel gets a
+    short version that fits its one line.
+    """
+    out = {}
+    for tag, fetch in (("claude", core.claude_quota), ("kimi", core.kimi_quota)):
+        try:
+            out[tag] = fetch() if fresh_for is None else fetch(fresh_for=fresh_for)
+        except Exception as exc:
+            sys.stderr.write("ai-usage: %s quota failed: %r\n" % (tag, exc))
+            out[tag] = {"ok": False, "why": "error: " + type(exc).__name__}
+    return out
 
 
 def _tool_state(name, side, quota, tag):
-    raw_limits, live, why = _limits_from_quota(quota)
+    raw_limits, live, why = core.live_limits(quota)
     limits = [
         {
             "label": lim["label"],
@@ -152,7 +162,7 @@ def main():
         forced = False
         now = time.time()
         if now - last_quota >= QUOTA_EVERY or last_quota == 0.0:
-            quota = {"claude": core.claude_quota(), "kimi": core.kimi_quota()}
+            quota = _fetch_quota()
             last_quota = now
         try:
             write_state(build_state(collector, quota))
@@ -167,10 +177,7 @@ def main():
             stamp = _trigger_mtime()
             if stamp != seen_trigger:
                 seen_trigger = stamp
-                quota = {
-                    "claude": core.claude_quota(fresh_for=FORCED_FRESH_S),
-                    "kimi": core.kimi_quota(fresh_for=FORCED_FRESH_S),
-                }
+                quota = _fetch_quota(FORCED_FRESH_S)
                 last_quota = time.time()
                 forced = True
                 break
