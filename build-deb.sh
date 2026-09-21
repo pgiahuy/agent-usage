@@ -34,6 +34,8 @@ install -m 644 "$SRC"/daemon/*.py         "$STAGE/usr/share/ai-usage/"
 install -m 644 "$SRC"/extension/*         "$STAGE/usr/share/gnome-shell/extensions/$UUID/"
 install -m 644 "$SRC/systemd/ai-usage.service" "$STAGE/usr/lib/systemd/user/ai-usage.service"
 install -m 644 "$SRC/README.md"           "$STAGE/usr/share/doc/ai-usage/README.md"
+install -d "$STAGE/usr/share/doc/ai-usage/docs"
+install -m 644 "$SRC"/docs/*.md           "$STAGE/usr/share/doc/ai-usage/docs/"
 
 # The launcher is the one file that has to know where things landed.
 sed -e "s|@PYTHON@|/usr/bin/python3|" -e "s|@APP_DIR@|/usr/share/ai-usage|" \
