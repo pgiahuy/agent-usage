@@ -5,7 +5,7 @@ Panel: a ring gauge of Claude's 5-hour window, coloured by severity, plus a
 short label. Click it for the full breakdown: quota bars with reset times, and
 tokens spent today / over the last 7 days for both tools, split by model.
 
-Run:  ai-usage --tray        (normally started by systemctl --user)
+Run:  agent-usage --tray        (normally started by systemctl --user)
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ import ring  # noqa: E402
 import rows  # noqa: E402
 import usage_core as core  # noqa: E402
 
-APP_ID = "ai-usage"
+APP_ID = "agent-usage"
 FALLBACK_ICON = "utilities-system-monitor-symbolic"
 LABEL_GUIDE = "100% · wk 100% · K 000M"
 LOCAL_REFRESH_S = 20  # rescan logs (near-free once offsets are warm)
@@ -59,7 +59,7 @@ class Indicator:
             APP_ID, FALLBACK_ICON, AppIndicator.IndicatorCategory.SYSTEM_SERVICES
         )
         self.ind.set_status(AppIndicator.IndicatorStatus.ACTIVE)
-        self.ind.set_title("AI usage")
+        self.ind.set_title("Agent usage")
         self.menu = Gtk.Menu()
         self.ind.set_menu(self.menu)
         self.ind.set_label("…", LABEL_GUIDE)
@@ -84,7 +84,7 @@ class Indicator:
         try:
             self.local = self.collector.local()
         except Exception as exc:  # the indicator must never die
-            sys.stderr.write("ai-usage: log scan failed: %r\n" % (exc,))
+            sys.stderr.write("agent-usage: log scan failed: %r\n" % (exc,))
             return
         self._render()
 
@@ -137,7 +137,7 @@ class Indicator:
             path = ring.write_icon(core.CACHE_DIR, 0, "normal", known=False)
         if path and path != self._icon:
             self._icon = path
-            self.ind.set_icon_full(path, "AI usage")
+            self.ind.set_icon_full(path, "Agent usage")
 
     # -- menu ----------------------------------------------------------------
 
@@ -169,7 +169,7 @@ class Indicator:
         # No Quit item on purpose: this is a always-on readout, and the unit is
         # Restart=always, so quitting from the menu would only make it vanish
         # for five seconds. Stop it deliberately with:
-        #   systemctl --user stop ai-usage
+        #   systemctl --user stop agent-usage
         self.menu.show_all()
 
 

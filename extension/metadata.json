@@ -1,7 +1,7 @@
 {
-  "uuid": "ai-usage@pgiahuy.github.io",
-  "name": "AI Usage",
-  "description": "Claude Code and Kimi Code quota and token usage in the top bar. Reads ~/.cache/ai-usage/state.json, written by the ai-usage collector.",
+  "uuid": "agent-usage@pgiahuy.github.io",
+  "name": "Agent Usage",
+  "description": "Claude Code and Kimi Code quota and token usage in the top bar. Reads ~/.cache/agent-usage/state.json, written by the agent-usage collector.",
   "shell-version": ["48", "49", "50"],
   "version": 1
 }

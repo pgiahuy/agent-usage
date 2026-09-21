@@ -46,7 +46,7 @@ KIMI_GLOB = os.path.join(KIMI_HOME, "sessions", "*", "*", "agents", "*", "wire.j
 KIMI_CREDS = os.path.join(KIMI_HOME, "credentials", "kimi-code.json")
 
 CACHE_DIR = os.path.join(
-    os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "ai-usage"
+    os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "agent-usage"
 )
 
 # Only the last 7 days are ever reported; the extra day absorbs timezone skew.
@@ -277,7 +277,7 @@ def _get_json(url, token, timeout, extra_headers=None):
     headers = {
         "Authorization": "Bearer " + token,
         "Accept": "application/json",
-        "User-Agent": "ai-usage-indicator/1.0",
+        "User-Agent": "agent-usage-indicator/1.0",
     }
     if extra_headers:
         headers.update(extra_headers)

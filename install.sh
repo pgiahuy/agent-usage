@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Install ai-usage into the current user's home. No root, nothing outside
+# Install agent-usage into the current user's home. No root, nothing outside
 # $HOME. Re-running it is the upgrade path.
 set -euo pipefail
 
-UUID=ai-usage@pgiahuy.github.io
+UUID=agent-usage@pgiahuy.github.io
 SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 BIN_DIR=$HOME/.local/bin
-APP_DIR=$DATA_HOME/ai-usage
+APP_DIR=$DATA_HOME/agent-usage
 EXT_DIR=$DATA_HOME/gnome-shell/extensions/$UUID
 UNIT_DIR=$CONFIG_HOME/systemd/user
 
@@ -22,7 +22,7 @@ for arg in "$@"; do
 usage: ./install.sh [--no-service]
 
   --no-service   copy the files but do not touch systemd; start the collector
-                 yourself with: ai-usage --daemon
+                 yourself with: agent-usage --daemon
 EOF
       exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
@@ -52,11 +52,11 @@ pick_python() {
 }
 
 PYTHON=$(pick_python) || {
-  echo "ai-usage: no python3 >= 3.8 found" >&2
+  echo "agent-usage: no python3 >= 3.8 found" >&2
   exit 1
 }
 
-echo "ai-usage: installing"
+echo "agent-usage: installing"
 say "python:    $PYTHON"
 
 # --- gnome shell version --------------------------------------------------
@@ -66,7 +66,7 @@ if command -v gnome-shell >/dev/null 2>&1; then
   if [ -n "${shell_version:-}" ] && [ "$shell_version" -lt 48 ] 2>/dev/null; then
     say "warning: the extension needs GNOME Shell 48 or newer (St.BoxLayout"
     say "         gained the orientation property there). The collector and"
-    say "         the 'ai-usage' terminal view work on any version."
+    say "         the 'agent-usage' terminal view work on any version."
   fi
 else
   say "gnome shell: not found, installing the collector and CLI only"
@@ -78,10 +78,10 @@ install -m 644 "$SRC"/daemon/*.py "$APP_DIR/"
 rm -rf "$APP_DIR/__pycache__"
 
 sed -e "s|@PYTHON@|$PYTHON|" -e "s|@APP_DIR@|$APP_DIR|" \
-    "$SRC/bin/ai-usage.in" > "$BIN_DIR/ai-usage"
-chmod 755 "$BIN_DIR/ai-usage"
+    "$SRC/bin/agent-usage.in" > "$BIN_DIR/agent-usage"
+chmod 755 "$BIN_DIR/agent-usage"
 say "collector: $APP_DIR"
-say "command:   $BIN_DIR/ai-usage"
+say "command:   $BIN_DIR/agent-usage"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
@@ -99,13 +99,13 @@ say "extension: $EXT_DIR"
 
 # --- service --------------------------------------------------------------
 if [ "$with_service" -eq 1 ]; then
-  install -m 644 "$SRC/systemd/ai-usage.service" "$UNIT_DIR/ai-usage.service"
+  install -m 644 "$SRC/systemd/agent-usage.service" "$UNIT_DIR/agent-usage.service"
   if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload
-    systemctl --user enable --now ai-usage.service
-    say "service:   $(systemctl --user is-active ai-usage.service)"
+    systemctl --user enable --now agent-usage.service
+    say "service:   $(systemctl --user is-active agent-usage.service)"
   else
-    say "service:   systemd not found; run 'ai-usage --daemon' yourself"
+    say "service:   systemd not found; run 'agent-usage --daemon' yourself"
   fi
 fi
 
@@ -144,4 +144,4 @@ else
   echo
   echo "  log out and back in, then run:  gnome-extensions enable $UUID"
 fi
-echo "Check the numbers from a terminal any time with: ai-usage"
+echo "Check the numbers from a terminal any time with: agent-usage"

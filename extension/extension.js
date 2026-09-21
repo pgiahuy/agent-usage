@@ -1,4 +1,4 @@
-/* AI Usage: Claude Code and Kimi Code usage in the GNOME top bar.
+/* Agent Usage: Claude Code and Kimi Code usage in the GNOME top bar.
  *
  * This file is a loader and nothing else. Do not put UI in it.
  *
@@ -12,8 +12,8 @@
  * the shell reloads stylesheet.css on every enable.
  *
  * Everything else about this extension is presentation only: all parsing and
- * every network call live in the ai-usage Python daemon, which writes
- * ~/.cache/ai-usage/state.json.
+ * every network call live in the agent-usage Python daemon, which writes
+ * ~/.cache/agent-usage/state.json.
  */
 
 import Gio from 'gi://Gio';
@@ -36,13 +36,13 @@ function newestUi(path) {
     return best;
 }
 
-export default class AiUsageExtension extends Extension {
+export default class AgentUsageExtension extends Extension {
     async enable() {
         const name = newestUi(this.path);
         if (!name)
-            throw new Error(`ai-usage: no ui-<n>.js in ${this.path}`);
-        const {AiUsageUi} = await import(`file://${this.path}/${name}`);
-        this._ui = new AiUsageUi(this);
+            throw new Error(`agent-usage: no ui-<n>.js in ${this.path}`);
+        const {AgentUsageUi} = await import(`file://${this.path}/${name}`);
+        this._ui = new AgentUsageUi(this);
         this._ui.enable();
     }
 

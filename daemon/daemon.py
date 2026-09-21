@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Headless collector: keep ~/.cache/ai-usage/state.json current.
+"""Headless collector: keep ~/.cache/agent-usage/state.json current.
 
 The GNOME Shell extension is pure presentation: it reads this file and draws.
 Keeping the log parsing and the quota calls here means the shell process never
@@ -76,7 +76,7 @@ def _fetch_quota(fresh_for=None):
         try:
             out[tag] = fetch() if fresh_for is None else fetch(fresh_for=fresh_for)
         except Exception as exc:
-            sys.stderr.write("ai-usage: %s quota failed: %r\n" % (tag, exc))
+            sys.stderr.write("agent-usage: %s quota failed: %r\n" % (tag, exc))
             out[tag] = {"ok": False, "why": "error: " + type(exc).__name__}
     return out
 
@@ -167,7 +167,7 @@ def main():
         try:
             write_state(build_state(collector, quota))
         except Exception as exc:  # a bad cycle must not kill the daemon
-            sys.stderr.write("ai-usage: state write failed: %r\n" % (exc,))
+            sys.stderr.write("agent-usage: state write failed: %r\n" % (exc,))
 
         # Wake every second so SIGTERM lands promptly and a Refresh click is
         # picked up without waiting out the whole interval.

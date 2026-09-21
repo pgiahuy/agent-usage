@@ -1,4 +1,4 @@
-# ai-usage
+# agent-usage
 
 Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
 spent, when it resets, and how many tokens went out today and over the week.
@@ -28,12 +28,12 @@ shows token counts only, with no quota bars. Signing in to Claude Code with an
 API key rather than a subscription also gives no quota bars, because the quota
 endpoint measures a plan.
 
-The terminal view (`ai-usage`) works anywhere, GNOME or not.
+The terminal view (`agent-usage`) works anywhere, GNOME or not.
 
 ## Install
 
 ```sh
-git clone https://github.com/pgiahuy/ai-usage.git && cd ai-usage
+git clone https://github.com/pgiahuy/agent-usage.git && cd agent-usage
 ./install.sh
 ```
 
@@ -44,17 +44,17 @@ Re-running `./install.sh` is the upgrade path. After an upgrade, reload the
 extension with:
 
 ```sh
-gnome-extensions disable ai-usage@pgiahuy.github.io && gnome-extensions enable ai-usage@pgiahuy.github.io
+gnome-extensions disable agent-usage@pgiahuy.github.io && gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
 
 Everything lands under `$HOME`, no root and no system packages:
 
 ```
-~/.local/share/ai-usage/                            collector
-~/.local/bin/ai-usage                               command
-~/.local/share/gnome-shell/extensions/ai-usage@pgiahuy.github.io/   extension
-~/.config/systemd/user/ai-usage.service             service
-~/.cache/ai-usage/                                  readings, ring icons
+~/.local/share/agent-usage/                            collector
+~/.local/bin/agent-usage                               command
+~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io/   extension
+~/.config/systemd/user/agent-usage.service             service
+~/.cache/agent-usage/                                  readings, ring icons
 ```
 
 For a system-wide install with a `.deb`, or publishing to an APT repository,
@@ -70,16 +70,16 @@ see [docs/packaging.md](docs/packaging.md).
 ## Terminal
 
 ```
-$ ai-usage
+$ agent-usage
  CLAUDE
    5-hour           █░░░░░░░░░   3%   resets Thu 04:09
    Weekly           ██░░░░░░░░  18%   resets Tue 16:00
    Today              670.3M tokens     3.0k req
    ...
 
-$ ai-usage --json     # same reading, machine readable
-$ ai-usage --daemon   # the collector, in the foreground
-$ ai-usage --tray     # AppIndicator fallback, needs PyGObject
+$ agent-usage --json     # same reading, machine readable
+$ agent-usage --daemon   # the collector, in the foreground
+$ agent-usage --tray     # AppIndicator fallback, needs PyGObject
 ```
 
 ## Data and privacy
@@ -88,14 +88,14 @@ The collector reads, locally, `~/.claude/.credentials.json` and
 `~/.kimi-code/credentials/kimi-code.json` for the access tokens, and
 `~/.claude/projects/**/*.jsonl` and `~/.kimi-code/sessions/**/wire.jsonl` for
 token counts. It talks to exactly two hosts, `api.anthropic.com` and
-`api.kimi.com`, and writes only inside `~/.cache/ai-usage`. No telemetry.
+`api.kimi.com`, and writes only inside `~/.cache/agent-usage`. No telemetry.
 
 It never refreshes or rotates a token: Kimi's access token lives 15 minutes,
 so outside an active `kimi` session its bars fall back to "no quota".
 
 If a tool keeps its data elsewhere, the collector follows `CLAUDE_CONFIG_DIR`
 and `KIMI_CODE_HOME`. A systemd user service does not read `.bashrc`, so set
-them in `~/.config/environment.d/ai-usage.conf`:
+them in `~/.config/environment.d/agent-usage.conf`:
 
 ```
 CLAUDE_CONFIG_DIR=/data/claude
@@ -105,11 +105,11 @@ KIMI_CODE_HOME=/data/kimi-code
 ## Troubleshooting
 
 **Nothing in the panel.** Log out once after the first install. Then
-`gnome-extensions info ai-usage@pgiahuy.github.io` should say ACTIVE, and
+`gnome-extensions info agent-usage@pgiahuy.github.io` should say ACTIVE, and
 `journalctl --user -u org.gnome.Shell@wayland -n 50` shows any load error.
 
-**"ai-usage daemon is not running".** `systemctl --user status ai-usage`, and
-`journalctl --user -u ai-usage -n 50` for the reason.
+**"agent-usage daemon is not running".** `systemctl --user status agent-usage`, and
+`journalctl --user -u agent-usage -n 50` for the reason.
 
 **Claude says "rate limited".** Expected after too many forced refreshes; it
 clears itself. The last known reading stays on screen, marked as such.
@@ -118,7 +118,7 @@ clears itself. The last known reading stays on screen, marked as such.
 five minutes.
 
 **`--tray` fails to start.** That fallback needs PyGObject, which pyenv and
-conda interpreters do not have. Point the `PY=` line of `~/.local/bin/ai-usage`
+conda interpreters do not have. Point the `PY=` line of `~/.local/bin/agent-usage`
 at `/usr/bin/python3`.
 
 ## Development

@@ -1,4 +1,4 @@
-/* The AI Usage panel UI: every limit is its own raised tile, with the token
+/* The Agent Usage panel UI: every limit is its own raised tile, with the token
  * counts as two tiles side by side underneath.
  *
  * Loaded by extension.js, which always imports the highest-numbered ui-<n>.js.
@@ -26,7 +26,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 // one is still registered when a newer one loads, so GTypes have to be named apart.
 const REV = /ui-(\d+)\.js$/.exec(import.meta.url)?.[1] ?? '0';
 
-const CACHE_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'ai-usage']);
+const CACHE_DIR = GLib.build_filenamev([GLib.get_user_cache_dir(), 'agent-usage']);
 const STATE_PATH = GLib.build_filenamev([CACHE_DIR, 'state.json']);
 const REFRESH_TRIGGER = GLib.build_filenamev([CACHE_DIR, 'refresh-request']);
 
@@ -51,10 +51,10 @@ const consumed = limit => Math.max(0, Math.min(100, limit.percent ?? 0));
 
 /* ---------------------------------------------------------------- panel pill */
 
-const Pill = GObject.registerClass({GTypeName: `AiUsagePill${REV}`},
+const Pill = GObject.registerClass({GTypeName: `AgentUsagePill${REV}`},
 class Pill extends St.BoxLayout {
     _init() {
-        super._init({style_class: 'ai-usage-pill', y_align: Clutter.ActorAlign.CENTER});
+        super._init({style_class: 'agent-usage-pill', y_align: Clutter.ActorAlign.CENTER});
         this._slots = [];
     }
 
@@ -78,11 +78,11 @@ class Pill extends St.BoxLayout {
 
     _addSlot(withSeparator) {
         if (withSeparator)
-            this.add_child(new St.Widget({style_class: 'ai-usage-pill-sep'}));
-        const box = new St.BoxLayout({style_class: 'ai-usage-mini',
+            this.add_child(new St.Widget({style_class: 'agent-usage-pill-sep'}));
+        const box = new St.BoxLayout({style_class: 'agent-usage-mini',
                                       y_align: Clutter.ActorAlign.CENTER});
         const icon = new St.Icon({icon_size: RING_SIZE, y_align: Clutter.ActorAlign.CENTER});
-        const label = new St.Label({style_class: 'ai-usage-badge',
+        const label = new St.Label({style_class: 'agent-usage-badge',
                                     y_align: Clutter.ActorAlign.CENTER});
         box.add_child(icon);
         box.add_child(label);
@@ -95,7 +95,7 @@ class Pill extends St.BoxLayout {
 
 function tile(extraClass) {
     return new St.BoxLayout({
-        style_class: extraClass ? `ai-usage-tile ${extraClass}` : 'ai-usage-tile',
+        style_class: extraClass ? `agent-usage-tile ${extraClass}` : 'agent-usage-tile',
         orientation: Clutter.Orientation.VERTICAL,
     });
 }
@@ -104,21 +104,21 @@ function tile(extraClass) {
 // right. The "%" is a second label rather than markup: Pango sizes are in
 // points and the rest of this sheet is in px, so mixing them drifts.
 function tileHead(name, note, value, colour) {
-    const row = new St.BoxLayout({style_class: 'ai-usage-trow'});
-    row.add_child(new St.Label({style_class: 'ai-usage-row-name', text: name,
+    const row = new St.BoxLayout({style_class: 'agent-usage-trow'});
+    row.add_child(new St.Label({style_class: 'agent-usage-row-name', text: name,
                                 y_align: Clutter.ActorAlign.CENTER}));
     if (note) {
-        row.add_child(new St.Label({style_class: 'ai-usage-when', text: note,
+        row.add_child(new St.Label({style_class: 'agent-usage-when', text: note,
                                     y_align: Clutter.ActorAlign.CENTER}));
     }
     row.add_child(new St.Widget({x_expand: true}));
     if (value !== null) {
-        const box = new St.BoxLayout({style_class: 'ai-usage-pct-box',
+        const box = new St.BoxLayout({style_class: 'agent-usage-pct-box',
                                       y_align: Clutter.ActorAlign.CENTER});
-        box.add_child(new St.Label({style_class: 'ai-usage-pct', text: String(value),
+        box.add_child(new St.Label({style_class: 'agent-usage-pct', text: String(value),
                                     style: `color: ${colour};`,
                                     y_align: Clutter.ActorAlign.CENTER}));
-        box.add_child(new St.Label({style_class: 'ai-usage-pct-unit', text: '%',
+        box.add_child(new St.Label({style_class: 'agent-usage-pct-unit', text: '%',
                                     style: `color: ${colour};`,
                                     y_align: Clutter.ActorAlign.END}));
         row.add_child(box);
@@ -134,12 +134,12 @@ function limitTile(limit) {
     // A horizontal BoxLayout, not a BinLayout: BinLayout centres the fill, so a
     // short bar floats in the middle of its track instead of starting at the
     // leading edge.
-    const track = new St.BoxLayout({style_class: 'ai-usage-track',
+    const track = new St.BoxLayout({style_class: 'agent-usage-track',
                                     y_align: Clutter.ActorAlign.CENTER});
     let width = Math.round(used / 100 * TRACK_W);
     if (used > 0 && width < MIN_FILL)
         width = MIN_FILL;
-    track.add_child(new St.Widget({style_class: 'ai-usage-fill',
+    track.add_child(new St.Widget({style_class: 'agent-usage-fill',
                                    style: `background-color: ${limit.colour}; width: ${width}px;`}));
     box.add_child(track);
     return box;
@@ -153,12 +153,12 @@ function noQuotaTile(why) {
 }
 
 function statTiles(today, week) {
-    const row = new St.BoxLayout({style_class: 'ai-usage-duo'});
+    const row = new St.BoxLayout({style_class: 'agent-usage-duo'});
     for (const [name, totals] of [['today', today], ['7 days', week]]) {
-        const box = tile('ai-usage-duo-tile');
-        box.add_child(new St.Label({style_class: 'ai-usage-stat-k', text: name}));
-        box.add_child(new St.Label({style_class: 'ai-usage-stat-v', text: totals.tokens_h}));
-        box.add_child(new St.Label({style_class: 'ai-usage-stat-k',
+        const box = tile('agent-usage-duo-tile');
+        box.add_child(new St.Label({style_class: 'agent-usage-stat-k', text: name}));
+        box.add_child(new St.Label({style_class: 'agent-usage-stat-v', text: totals.tokens_h}));
+        box.add_child(new St.Label({style_class: 'agent-usage-stat-k',
                                     text: `${fmtInt(totals.reqs)} req`}));
         row.add_child(box);
     }
@@ -168,8 +168,8 @@ function statTiles(today, week) {
 function noteRow(text) {
     // Notes must wrap: a provider error can be a whole sentence, and
     // ellipsising it hides the part that says what went wrong.
-    const row = new St.BoxLayout({style_class: 'ai-usage-note-row'});
-    const label = new St.Label({style_class: 'ai-usage-note', text, x_expand: true});
+    const row = new St.BoxLayout({style_class: 'agent-usage-note-row'});
+    const label = new St.Label({style_class: 'agent-usage-note', text, x_expand: true});
     label.clutter_text.line_wrap = true;
     label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
     label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
@@ -189,17 +189,17 @@ function spaced(name) {
 
 /* ------------------------------------------------------------------ indicator */
 
-const Indicator = GObject.registerClass({GTypeName: `AiUsageIndicator${REV}`},
+const Indicator = GObject.registerClass({GTypeName: `AgentUsageIndicator${REV}`},
 class Indicator extends PanelMenu.Button {
     _init() {
-        super._init(0.5, 'AI Usage', false);
+        super._init(0.5, 'Agent Usage', false);
         // Marks the button so the stylesheet can strip the panel's own padding
-        // and hover paint; see the note beside .ai-usage-panel-button.
-        this.add_style_class_name('ai-usage-panel-button');
+        // and hover paint; see the note beside .agent-usage-panel-button.
+        this.add_style_class_name('agent-usage-panel-button');
         this._pill = new Pill();
         this.add_child(this._pill);
 
-        this._body = new St.BoxLayout({style_class: 'ai-usage-card',
+        this._body = new St.BoxLayout({style_class: 'agent-usage-card',
                                        orientation: Clutter.Orientation.VERTICAL});
         const item = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
         item.add_child(this._body);
@@ -262,8 +262,8 @@ class Indicator extends PanelMenu.Button {
         if (!tools.length) {
             this._pill.update([{accent: '#8b90a0', badge: 'n/a', icon: null}]);
             this._body.add_child(new St.Label({
-                style_class: 'ai-usage-note',
-                text: 'ai-usage daemon is not running.\nsystemctl --user start ai-usage',
+                style_class: 'agent-usage-note',
+                text: 'agent-usage daemon is not running.\nsystemctl --user start agent-usage',
             }));
             return;
         }
@@ -272,15 +272,15 @@ class Indicator extends PanelMenu.Button {
 
         tools.forEach((tool, index) => {
             const block = new St.BoxLayout({
-                style_class: index ? 'ai-usage-tool ai-usage-tool-next' : 'ai-usage-tool',
+                style_class: index ? 'agent-usage-tool agent-usage-tool-next' : 'agent-usage-tool',
                 orientation: Clutter.Orientation.VERTICAL,
             });
 
-            const head = new St.BoxLayout({style_class: 'ai-usage-head'});
-            head.add_child(new St.Widget({style_class: 'ai-usage-dot',
+            const head = new St.BoxLayout({style_class: 'agent-usage-head'});
+            head.add_child(new St.Widget({style_class: 'agent-usage-dot',
                                           style: `background-color: ${tool.accent};`,
                                           y_align: Clutter.ActorAlign.CENTER}));
-            head.add_child(new St.Label({style_class: 'ai-usage-tool-name',
+            head.add_child(new St.Label({style_class: 'agent-usage-tool-name',
                                          text: spaced(tool.name),
                                          style: `color: ${tool.accent};`,
                                          y_align: Clutter.ActorAlign.CENTER}));
@@ -310,7 +310,7 @@ class Indicator extends PanelMenu.Button {
         const icon = new St.Icon({icon_name: 'view-refresh-symbolic', icon_size: 14});
         icon.set_pivot_point(0.5, 0.5);  // spin about its own centre, not a corner
         this._spinIcon = icon;
-        const button = new St.Button({style_class: 'ai-usage-refresh',
+        const button = new St.Button({style_class: 'agent-usage-refresh',
                                       can_focus: true,
                                       child: icon});
         button.connect('clicked', () => {
@@ -320,7 +320,7 @@ class Indicator extends PanelMenu.Button {
                 GLib.file_set_contents(REFRESH_TRIGGER, String(GLib.get_real_time()));
                 this._startSpin();
             } catch (e) {
-                logError(e, 'ai-usage: could not request a refresh');
+                logError(e, 'agent-usage: could not request a refresh');
             }
         });
         return button;
@@ -329,7 +329,7 @@ class Indicator extends PanelMenu.Button {
 
 /* ------------------------------------------------------------------------ ui */
 
-export class AiUsageUi {
+export class AgentUsageUi {
     constructor(extension) {
         this._uuid = extension.uuid;
     }

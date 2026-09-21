@@ -2,7 +2,7 @@
 # Remove everything install.sh put in place.
 set -euo pipefail
 
-UUID=ai-usage@pgiahuy.github.io
+UUID=agent-usage@pgiahuy.github.io
 DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
@@ -13,16 +13,16 @@ for arg in "$@"; do
     --purge) purge=1 ;;
     -h|--help)
       echo "usage: ./uninstall.sh [--purge]"
-      echo "  --purge   also delete $CACHE_HOME/ai-usage (cached readings and icons)"
+      echo "  --purge   also delete $CACHE_HOME/agent-usage (cached readings and icons)"
       exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
 
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user disable --now ai-usage.service 2>/dev/null || true
+  systemctl --user disable --now agent-usage.service 2>/dev/null || true
 fi
-rm -f "$CONFIG_HOME/systemd/user/ai-usage.service"
+rm -f "$CONFIG_HOME/systemd/user/agent-usage.service"
 command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload || true
 
 if command -v gnome-extensions >/dev/null 2>&1; then
@@ -30,10 +30,10 @@ if command -v gnome-extensions >/dev/null 2>&1; then
 fi
 
 rm -rf "$DATA_HOME/gnome-shell/extensions/$UUID"
-rm -rf "$DATA_HOME/ai-usage"
-rm -f "$HOME/.local/bin/ai-usage"
-[ "$purge" -eq 1 ] && rm -rf "$CACHE_HOME/ai-usage"
+rm -rf "$DATA_HOME/agent-usage"
+rm -f "$HOME/.local/bin/agent-usage"
+[ "$purge" -eq 1 ] && rm -rf "$CACHE_HOME/agent-usage"
 
-echo "ai-usage: removed."
-[ "$purge" -eq 1 ] || echo "Cached readings left in $CACHE_HOME/ai-usage (--purge removes them)."
+echo "agent-usage: removed."
+[ "$purge" -eq 1 ] || echo "Cached readings left in $CACHE_HOME/agent-usage (--purge removes them)."
 echo "Nothing was touched in ~/.claude or ~/.kimi-code."

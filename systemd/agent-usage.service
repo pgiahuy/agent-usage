@@ -1,13 +1,13 @@
 [Unit]
-Description=AI usage collector for the GNOME AI Usage extension
+Description=Agent usage collector for the GNOME Agent Usage extension
 PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/ai-usage --daemon
+ExecStart=%h/.local/bin/agent-usage --daemon
 # Always, not on-failure: the panel readout goes stale the moment this stops.
-# Stop it on purpose with `systemctl --user stop ai-usage`.
+# Stop it on purpose with `systemctl --user stop agent-usage`.
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

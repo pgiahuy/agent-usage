@@ -6,7 +6,7 @@ Two pieces, on purpose:
 
 - **The collector** (`daemon.py`) does all the work: it parses the logs, calls
   the quota endpoints, renders the ring icons, and writes one small JSON file
-  to `~/.cache/ai-usage/state.json`.
+  to `~/.cache/agent-usage/state.json`.
 - **The extension** only reads that file and draws it. The compositor never
   parses hundreds of megabytes of jsonl and never makes a network call; if the
   collector dies, the panel says so instead of freezing the shell.
@@ -23,7 +23,7 @@ and during that time there is no live reading at all.
 Kimi does not document a usage endpoint, so the collector probes a short list
 of candidate paths once, remembers the one that answers with percentages, and
 uses only that afterwards. The raw payload is kept at
-`~/.cache/ai-usage/kimi-raw.json`, which is the only record of what that API
+`~/.cache/agent-usage/kimi-raw.json`, which is the only record of what that API
 actually sends.
 
 ## Tokens
@@ -51,7 +51,7 @@ There is no settings UI. The knobs are constants at the top of the files:
 | Which Claude limits are shown | `_CLAUDE_SKIP_KINDS` in `usage_core.py` |
 | Card width, bar width, spin speed | top of `extension/ui-1.js` and `stylesheet.css` |
 
-After editing a Python file: `systemctl --user restart ai-usage`.
+After editing a Python file: `systemctl --user restart agent-usage`.
 
 ## Shipping a UI change
 
@@ -62,9 +62,9 @@ the way to ship a UI change to a running session is to copy the file to the
 next number and toggle the extension:
 
 ```sh
-cd ~/.local/share/gnome-shell/extensions/ai-usage@pgiahuy.github.io
+cd ~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io
 cp ui-1.js ui-2.js && $EDITOR ui-2.js
-gnome-extensions disable ai-usage@pgiahuy.github.io && gnome-extensions enable ai-usage@pgiahuy.github.io
+gnome-extensions disable agent-usage@pgiahuy.github.io && gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
 
 `stylesheet.css` is re-read on every enable, so CSS-only changes need no copy.

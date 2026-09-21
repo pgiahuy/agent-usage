@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Build an APT repository under docs/apt/ so that, once the repo is served over
 # HTTPS (GitHub Pages will do), users can install with plain `apt install
-# ai-usage` and get upgrades from `apt upgrade` like any other package.
+# agent-usage` and get upgrades from `apt upgrade` like any other package.
 #
 # The layout is the standard one apt expects:
 #
-#   docs/apt/pool/main/ai-usage_<version>_all.deb     the package
+#   docs/apt/pool/main/agent-usage_<version>_all.deb     the package
 #   docs/apt/dists/stable/main/binary-all/Packages    its index
 #   docs/apt/dists/stable/Release                     checksums of the indexes
 #   docs/apt/dists/stable/{InRelease,Release.gpg}     signatures over Release
-#   docs/apt/ai-usage.asc                             the public key
+#   docs/apt/agent-usage.asc                             the public key
 #
 # Signing is what makes `apt update` accept the repo without `trusted=yes`.
 # With no secret key present the script still builds a working unsigned repo
@@ -25,7 +25,7 @@ POOL="$REPO/pool/main"
 
 command -v dpkg-scanpackages >/dev/null || { echo "need dpkg-dev (dpkg-scanpackages)" >&2; exit 1; }
 
-DEB="$SRC/dist/ai-usage_${VERSION}_all.deb"
+DEB="$SRC/dist/agent-usage_${VERSION}_all.deb"
 [ -f "$DEB" ] || VERSION=$VERSION "$SRC/build-deb.sh" >/dev/null
 [ -f "$DEB" ] || { echo "missing $DEB" >&2; exit 1; }
 
@@ -49,8 +49,8 @@ checksums() {
   done
 }
 {
-  echo "Origin: ai-usage"
-  echo "Label: ai-usage"
+  echo "Origin: agent-usage"
+  echo "Label: agent-usage"
   echo "Suite: stable"
   echo "Codename: stable"
   echo "Architectures: all"
@@ -64,7 +64,7 @@ checksums() {
 } > "$DIST/Release"
 
 # --- signing --------------------------------------------------------------
-KEY=${AI_USAGE_GPG_KEY:-$(gpg --list-secret-keys --with-colons 2>/dev/null \
+KEY=${AGENT_USAGE_GPG_KEY:-$(gpg --list-secret-keys --with-colons 2>/dev/null \
                           | awk -F: '/^sec:/ {print $5; exit}')}
 if [ -n "${KEY:-}" ]; then
   rm -f "$DIST/Release.gpg" "$DIST/InRelease"
@@ -72,7 +72,7 @@ if [ -n "${KEY:-}" ]; then
       -o "$DIST/Release.gpg" "$DIST/Release"
   gpg --default-key "$KEY" --batch --yes --clearsign \
       -o "$DIST/InRelease" "$DIST/Release"
-  gpg --armor --export "$KEY" > "$REPO/ai-usage.asc"
+  gpg --armor --export "$KEY" > "$REPO/agent-usage.asc"
   echo "signed with $KEY"
 else
   cat >&2 <<'EOF'

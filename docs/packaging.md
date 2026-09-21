@@ -6,30 +6,30 @@ for a shared machine, or for installing with the package manager.
 ## System-wide (.deb)
 
 ```sh
-./build-deb.sh                              # -> dist/ai-usage_1.0.0_all.deb
-sudo apt install ./dist/ai-usage_1.0.0_all.deb
+./build-deb.sh                              # -> dist/agent-usage_1.0.0_all.deb
+sudo apt install ./dist/agent-usage_1.0.0_all.deb
 ```
 
-The package puts the collector in `/usr/share/ai-usage`, the command in
+The package puts the collector in `/usr/share/agent-usage`, the command in
 `/usr/bin`, the extension in `/usr/share/gnome-shell/extensions`, and the user
 service in `/usr/lib/systemd/user`. `postinst` runs `systemctl --global enable
-ai-usage.service`, so every user's session starts the collector at login.
+agent-usage.service`, so every user's session starts the collector at login.
 
 The extension stays per-user, because GNOME extensions are per-user by nature:
 
 ```sh
-gnome-extensions enable ai-usage@pgiahuy.github.io   # once per user, after one logout
+gnome-extensions enable agent-usage@pgiahuy.github.io   # once per user, after one logout
 ```
 
 Do not run `install.sh` as well, or you end up with two copies, one in
 `/usr` and one in `$HOME`, and the `$HOME` one wins on `PATH`.
 
-Removal is `sudo apt remove ai-usage`. That leaves each user's
-`~/.cache/ai-usage`, which is just cached readings and icons.
+Removal is `sudo apt remove agent-usage`. That leaves each user's
+`~/.cache/agent-usage`, which is just cached readings and icons.
 
-## `apt install ai-usage`, from your own repository
+## `apt install agent-usage`, from your own repository
 
-For plain `apt install ai-usage`, and `apt upgrade` picking up new versions
+For plain `apt install agent-usage`, and `apt upgrade` picking up new versions
 along with everything else, the package has to live in a repository the
 machine trusts. `build-apt-repo.sh` builds one into `docs/apt/`, which GitHub
 Pages can serve directly from the `main` branch (Settings → Pages → Source:
@@ -52,11 +52,11 @@ Then each user adds the source once:
 
 ```sh
 sudo install -d /etc/apt/keyrings
-curl -fsSL https://pgiahuy.github.io/ai-usage/apt/ai-usage.asc \
-  | sudo tee /etc/apt/keyrings/ai-usage.asc > /dev/null
-echo "deb [signed-by=/etc/apt/keyrings/ai-usage.asc] https://pgiahuy.github.io/ai-usage/apt stable main" \
-  | sudo tee /etc/apt/sources.list.d/ai-usage.list
-sudo apt update && sudo apt install ai-usage
+curl -fsSL https://pgiahuy.github.io/agent-usage/apt/agent-usage.asc \
+  | sudo tee /etc/apt/keyrings/agent-usage.asc > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/agent-usage.asc] https://pgiahuy.github.io/agent-usage/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/agent-usage.list
+sudo apt update && sudo apt install agent-usage
 ```
 
 Shipping a new version is `VERSION=1.1.0 ./build-apt-repo.sh` and another
@@ -65,5 +65,5 @@ commit. Note that the repository URL must not contain spaces: apt splits
 confusing "Release file not found".
 
 The other route is a Launchpad PPA, which builds from source you upload and
-gives Ubuntu users `add-apt-repository ppa:you/ai-usage`. It needs a Launchpad
+gives Ubuntu users `add-apt-repository ppa:you/agent-usage`. It needs a Launchpad
 account and a signed source upload; the `.deb` here is the same artifact.
