@@ -3,5 +3,6 @@
   "name": "Agent Usage",
   "description": "Claude Code and Kimi Code quota and token usage in the top bar. Reads ~/.cache/agent-usage/state.json, written by the agent-usage collector.",
   "shell-version": ["48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.agent-usage",
   "version": 1
 }

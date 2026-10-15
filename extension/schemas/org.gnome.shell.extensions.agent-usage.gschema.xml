@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.agent-usage"
+          path="/org/gnome/shell/extensions/agent-usage/">
+    <!-- The collector reads this key too, with the gsettings command, so a
+         rename here has to be matched in daemon/daemon.py. -->
+    <key name="quota-interval" type="u">
+      <range min="2" max="60"/>
+      <default>5</default>
+      <summary>Minutes between quota checks</summary>
+      <description>How often the collector asks each provider for plan usage. Anthropic rate-limits its usage endpoint hard, which is why this cannot go below two minutes. The Refresh button checks at once regardless.</description>
+    </key>
+  </schema>
+</schemalist>
