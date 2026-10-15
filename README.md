@@ -87,11 +87,15 @@ $ agent-usage --tray     # AppIndicator fallback, needs PyGObject
 The collector reads, locally, `~/.claude/.credentials.json` and
 `~/.kimi-code/credentials/kimi-code.json` for the access tokens, and
 `~/.claude/projects/**/*.jsonl` and `~/.kimi-code/sessions/**/wire.jsonl` for
-token counts. It talks to exactly two hosts, `api.anthropic.com` and
-`api.kimi.com`, and writes only inside `~/.cache/agent-usage`. No telemetry.
+token counts. It talks to `api.anthropic.com` and `api.kimi.com`, and writes
+inside `~/.cache/agent-usage`. No telemetry.
 
-It never refreshes or rotates a token: Kimi's access token lives 15 minutes,
-so outside an active `kimi` session its bars fall back to "no quota".
+The timed refresh never touches a token. Only the popup's Refresh button
+renews an expired one: for Kimi, the collector refreshes it at `auth.kimi.com`
+the way `kimi` itself does, under Kimi's own lock and never while `kimi` is
+running, and writes the new token back to Kimi's credentials file; for Claude,
+it runs `claude auth status`, then if needed one minimal `claude -p` prompt,
+so Claude Code renews its own token.
 
 If a tool keeps its data elsewhere, the collector follows `CLAUDE_CONFIG_DIR`
 and `KIMI_CODE_HOME`. A systemd user service does not read `.bashrc`, so set
@@ -114,8 +118,9 @@ KIMI_CODE_HOME=/data/kimi-code
 **Claude says "rate limited".** Expected after too many forced refreshes; it
 clears itself. The last known reading stays on screen, marked as such.
 
-**Kimi says "token expired".** Run any `kimi` command; the bars fill in within
-five minutes.
+**Kimi says "token expired".** Press Refresh in the popup. If it says "kimi is
+running", the token renews on its own the next time that session talks to
+Kimi.
 
 **`--tray` fails to start.** That fallback needs PyGObject, which pyenv and
 conda interpreters do not have. Point the `PY=` line of `~/.local/bin/agent-usage`

@@ -18,9 +18,12 @@ from __future__ import annotations
 import glob
 import json
 import os
+import shutil
 import socket
+import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta
 
@@ -44,6 +47,10 @@ CLAUDE_GLOB = os.path.join(CLAUDE_HOME, "projects", "**", "*.jsonl")
 CLAUDE_CREDS = os.path.join(CLAUDE_HOME, ".credentials.json")
 KIMI_GLOB = os.path.join(KIMI_HOME, "sessions", "*", "*", "agents", "*", "wire.jsonl")
 KIMI_CREDS = os.path.join(KIMI_HOME, "credentials", "kimi-code.json")
+# kimi serialises its own refreshes with proper-lockfile on this target, which
+# means a mkdir of "<target>.lock"; taking the same lock is what keeps the two
+# of us from both spending one rotating refresh token.
+KIMI_REFRESH_LOCK = os.path.join(KIMI_HOME, "oauth", "kimi-code") + ".lock"
 
 CACHE_DIR = os.path.join(
     os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "agent-usage"
@@ -368,13 +375,151 @@ def _fresh_token(path, key, exp_key, exp_unit):
     return tok, None
 
 
-def claude_quota(timeout=8, fresh_for=QUOTA_FRESH_S):
+def _find_cli(name, fallback):
+    # A systemd user unit gets a bare PATH, so ~/.local/bin is often missing.
+    return shutil.which(name) or (fallback if os.access(fallback, os.X_OK) else None)
+
+
+def renew_claude_token():
+    """Have Claude Code renew its own token, so we never refresh as Claude Code.
+
+    `auth status` costs nothing; if it leaves the token expired, one minimal
+    prompt does it, without tools, MCP servers or a saved session.
+    """
+    cli = _find_cli("claude", os.path.join(HOME, ".local", "bin", "claude"))
+    if cli is None:
+        return "claude not found"
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    attempts = (
+        ([cli, "auth", "status"], 20),
+        ([cli, "-p", "ok", "--model", "haiku", "--tools", "", "--strict-mcp-config",
+          "--no-session-persistence"], 120),
+    )
+    for argv, limit in attempts:
+        try:
+            subprocess.run(argv, cwd=CACHE_DIR, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=limit, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if _fresh_token(CLAUDE_CREDS, "accessToken", "expiresAt", "ms")[0]:
+            return None
+    return "renew failed"
+
+
+_KIMI_OAUTH_HOST = (os.environ.get("KIMI_CODE_OAUTH_HOST") or os.environ.get("KIMI_OAUTH_HOST")
+                    or "https://auth.kimi.com").rstrip("/")
+_KIMI_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098"
+
+
+def _kimi_running():
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as fh:
+                argv0 = fh.read().split(b"\0", 1)[0]
+        except OSError:
+            continue
+        if os.path.basename(argv0) == b"kimi":
+            return True
+    return False
+
+
+def _write_private_json(path, obj):
+    tmp = path + ".agent-usage.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        json.dump(obj, fh)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def renew_kimi_token(timeout=4):
+    """Refresh Kimi's token the way kimi itself does, under kimi's own lock.
+
+    The refresh token rotates, so a refresh racing kimi's would leave one side
+    holding a dead token and the user signed out. Hence: never while a kimi
+    process is running, never without the lock, and a lock that is held is
+    waited for by nobody: kimi stamps its lock every few seconds, and if it is
+    there, kimi is refreshing and will write the result itself.
+    """
+    if _kimi_running():
+        return "kimi is running"
+    try:
+        os.makedirs(os.path.dirname(KIMI_REFRESH_LOCK), exist_ok=True)
+        os.mkdir(KIMI_REFRESH_LOCK)
+    except FileExistsError:
+        return "kimi is refreshing"
+    except OSError as exc:
+        return _why(exc)
+    # proper-lockfile treats a lock untouched for 5 s as stale and takes it
+    # over, so the request timeout keeps the whole hold well under that.
+    try:
+        try:
+            with open(KIMI_CREDS) as fh:
+                creds = json.load(fh)
+        except (OSError, ValueError):
+            return "not signed in"
+        if _fresh_token(KIMI_CREDS, "access_token", "expires_at", "s")[0]:
+            return None
+        refresh = creds.get("refresh_token")
+        if not refresh:
+            return "no refresh token"
+        body = urllib.parse.urlencode({
+            "client_id": _KIMI_CLIENT_ID,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+        }).encode()
+        req = urllib.request.Request(
+            _KIMI_OAUTH_HOST + "/api/oauth/token", data=body, method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded",
+                     "Accept": "application/json",
+                     "User-Agent": "agent-usage-indicator/1.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            return "refresh HTTP %d" % exc.code
+        except (urllib.error.URLError, ValueError, TimeoutError, OSError) as exc:
+            return _why(exc)
+        access = data.get("access_token")
+        expires_in = data.get("expires_in")
+        if not access or not isinstance(expires_in, (int, float)):
+            return "bad refresh reply"
+        creds.update(
+            access_token=access,
+            refresh_token=data.get("refresh_token") or refresh,
+            expires_in=expires_in,
+            expires_at=int(time.time() + expires_in),
+        )
+        for key in ("scope", "token_type"):
+            if data.get(key):
+                creds[key] = data[key]
+        try:
+            _write_private_json(KIMI_CREDS, creds)
+        except OSError as exc:
+            return _why(exc)
+        return None
+    finally:
+        try:
+            os.rmdir(KIMI_REFRESH_LOCK)
+        except OSError:
+            pass
+
+
+def claude_quota(timeout=8, fresh_for=QUOTA_FRESH_S, renew=False):
     """Real plan utilisation, from the same endpoint /usage calls in Claude Code."""
     cached = _cache_read_versioned("claude-quota.json")
     if cached and time.time() - cached.get("fetched_at", 0) < fresh_for:
         return dict(cached, from_cache=True)
 
     tok, why = _fresh_token(CLAUDE_CREDS, "accessToken", "expiresAt", "ms")
+    if tok is None and renew and why == "token expired":
+        failed = renew_claude_token()
+        tok, why = _fresh_token(CLAUDE_CREDS, "accessToken", "expiresAt", "ms")
+        why = failed or why
     if tok is None:
         return {"ok": False, "why": why, "cached": cached}
     wait = _backoff_until("claude-backoff.json") - time.time()
@@ -627,17 +772,21 @@ def _kimi_probe(tok, timeout):
     return fallback[0], fallback[1], []
 
 
-def kimi_quota(timeout=8, fresh_for=QUOTA_FRESH_S):
+def kimi_quota(timeout=8, fresh_for=QUOTA_FRESH_S, renew=False):
     """Real usage from Kimi's own API, if it will give any.
 
     Kimi Code's access token lives 15 minutes, so outside an active kimi session
-    it is usually expired and this says so rather than guessing. Nothing is
-    refreshed here: rotating the refresh token could break kimi's own login."""
+    it is usually expired. Only an explicit Refresh renews it (renew=True); the
+    timed loop never spends the rotating refresh token on its own."""
     cached = _cache_read_versioned("kimi-quota.json")
     if cached and time.time() - cached.get("fetched_at", 0) < fresh_for:
         return dict(cached, from_cache=True)
 
     tok, why = _fresh_token(KIMI_CREDS, "access_token", "expires_at", "s")
+    if tok is None and renew and why == "token expired":
+        failed = renew_kimi_token()
+        tok, why = _fresh_token(KIMI_CREDS, "access_token", "expires_at", "s")
+        why = failed or why
     if tok is None:
         return {"ok": False, "why": why, "cached": cached}
     wait = _backoff_until("kimi-backoff.json") - time.time()

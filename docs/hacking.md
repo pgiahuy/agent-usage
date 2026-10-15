@@ -33,11 +33,24 @@ The collector reads the token each tool wrote when you signed in:
 - `~/.claude/.credentials.json`: Claude Code refreshes this as you use it, so
   it is normally valid and the Claude bars are always there.
 - `~/.kimi-code/credentials/kimi-code.json`: Kimi's access token lives 15
-  minutes, so the Kimi bars appear only if you have run `kimi` recently.
+  minutes, so on the timed loop the Kimi bars appear only if you have run
+  `kimi` recently.
 
-The collector deliberately never refreshes the Kimi token: rotating the
-refresh token could invalidate the one Kimi Code itself holds and break its
-login.
+An explicit Refresh renews an expired token (`renew=True` in `daemon.py`); the
+timed loop never does.
+
+- Kimi: the refresh token rotates, so a refresh racing Kimi Code's own would
+  leave one side holding a dead token and the user signed out.
+  `renew_kimi_token` therefore refuses while any `kimi` process runs, takes
+  the lock Kimi itself uses (proper-lockfile, i.e. a mkdir of
+  `~/.kimi-code/oauth/kimi-code.lock`), backs off if Kimi holds it, re-reads
+  the file under the lock, and writes the result back atomically with mode
+  0600. proper-lockfile treats a lock untouched for 5s as stale, so the
+  request timeout keeps the hold under that.
+- Claude: the collector never refreshes as Claude Code. `renew_claude_token`
+  runs `claude auth status`, and if that leaves the token expired, one
+  `claude -p ok` on haiku with no tools, no MCP servers and no saved session.
+  That call can take a while, and the daemon loop waits for it.
 
 ## Configuration
 
