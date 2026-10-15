@@ -151,7 +151,7 @@ def build_state(collector, quota):
 
 
 def write_state(state):
-    os.makedirs(core.CACHE_DIR, exist_ok=True)
+    core.ensure_cache_dir()
     tmp = STATE_PATH + ".tmp"
     with open(tmp, "w") as fh:
         json.dump(state, fh)
