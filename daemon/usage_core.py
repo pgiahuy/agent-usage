@@ -280,6 +280,21 @@ QUOTA_FRESH_S = 120
 _BACKOFF_MIN, _BACKOFF_MAX = 60.0, 900.0
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Turn every redirect into an HTTPError instead of following it.
+
+    urllib copies the Authorization header onto the redirected request, to any
+    host and even from https down to http, so following one would hand the
+    bearer token to wherever the Location points.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _get_json(url, token, timeout, extra_headers=None):
     headers = {
         "Authorization": "Bearer " + token,
@@ -289,13 +304,22 @@ def _get_json(url, token, timeout, extra_headers=None):
     if extra_headers:
         headers.update(extra_headers)
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _OPENER.open(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def ensure_cache_dir():
+    """Create the cache directory private to the user, and make it so if an
+    older build left it group-writable: it holds quota readings and Kimi's raw
+    usage reply."""
+    os.makedirs(CACHE_DIR, mode=0o700, exist_ok=True)
+    if os.stat(CACHE_DIR).st_mode & 0o077:
+        os.chmod(CACHE_DIR, 0o700)
 
 
 def _cache_write(name, obj):
     try:
-        os.makedirs(CACHE_DIR, exist_ok=True)
+        ensure_cache_dir()
         tmp = os.path.join(CACHE_DIR, name + ".tmp")
         with open(tmp, "w") as fh:
             json.dump(obj, fh)
@@ -389,7 +413,7 @@ def renew_claude_token():
     cli = _find_cli("claude", os.path.join(HOME, ".local", "bin", "claude"))
     if cli is None:
         return "claude not found"
-    os.makedirs(CACHE_DIR, exist_ok=True)
+    ensure_cache_dir()
     attempts = (
         ([cli, "auth", "status"], 20),
         ([cli, "-p", "ok", "--model", "haiku", "--tools", "", "--strict-mcp-config",
@@ -445,6 +469,8 @@ def renew_kimi_token(timeout=4):
     waited for by nobody: kimi stamps its lock every few seconds, and if it is
     there, kimi is refreshing and will write the result itself.
     """
+    if not _KIMI_OAUTH_HOST.startswith("https://"):
+        return "oauth host is not https"
     if _kimi_running():
         return "kimi is running"
     try:
@@ -478,7 +504,7 @@ def renew_kimi_token(timeout=4):
                      "Accept": "application/json",
                      "User-Agent": "agent-usage-indicator/1.0"})
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _OPENER.open(req, timeout=timeout) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             return "refresh HTTP %d" % exc.code
@@ -574,6 +600,7 @@ def claude_quota(timeout=8, fresh_for=QUOTA_FRESH_S, renew=False):
 
 
 _KIMI_BASE = "https://api.kimi.com"
+_KIMI_RAW_KEEP = frozenset({"usage", "usages", "limits"})
 
 # Kimi Code documents no usage endpoint, so the working one has to be found by
 # asking. The path that answers 200 is remembered and used alone afterwards; a
@@ -806,9 +833,13 @@ def kimi_quota(timeout=8, fresh_for=QUOTA_FRESH_S, renew=False):
     if path is None:
         return {"ok": False, "why": "no usage endpoint", "cached": cached}
 
-    # Keep the real payload: the mapper above is guesswork until this file has
-    # been read once, and it is the only record of what the API actually sends.
-    _cache_write("kimi-raw.json", {"path": path, "at": time.time(), "data": data})
+    # Keep the usage part of the real reply, the only record of what the API
+    # actually sends. The rest (account and subscription ids, the top-up wallet)
+    # is not ours to keep, so only its key names are recorded.
+    kept = {k: v for k, v in data.items() if k in _KIMI_RAW_KEEP} if isinstance(data, dict) else data
+    other = sorted(set(data) - _KIMI_RAW_KEEP) if isinstance(data, dict) else []
+    _cache_write("kimi-raw.json", {"path": path, "at": time.time(), "data": kept,
+                                   "dropped_keys": other})
 
     if not limits:
         return {"ok": False, "why": "no percentages at %s" % path.rsplit("/", 1)[-1],
