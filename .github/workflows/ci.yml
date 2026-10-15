@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (Python ${{ matrix.python }})
+    # 22.04 still has a Python 3.8 build, the oldest version the README promises.
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.8", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -W error::ResourceWarning -m unittest discover -s tests -v
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: ruff
+        run: pipx run ruff==0.17.0 check daemon tests
+      - name: shellcheck
+        run: shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in
+      - name: extension JavaScript parses
+        run: for f in extension/*.js; do node --check "$f"; done
+      - name: GSettings schema compiles
+        run: |
+          sudo apt-get install -y --no-install-recommends libglib2.0-bin
+          glib-compile-schemas --strict --dry-run extension/schemas
+
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y --no-install-recommends libglib2.0-bin
+      - name: build the .deb
+        run: ./build-deb.sh
+      - name: the .deb carries the collector, the providers and a compiled schema
+        run: |
+          deb=dist/agent-usage_*_all.deb
+          contents=$(dpkg-deb -c $deb)
+          for f in usr/share/agent-usage/daemon.py \
+                   usr/share/agent-usage/providers/claude.py \
+                   usr/share/agent-usage/providers/kimi.py \
+                   usr/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io/schemas/gschemas.compiled \
+                   usr/bin/agent-usage; do
+            grep -q "$f" <<<"$contents" || { echo "missing: $f"; exit 1; }
+          done

@@ -31,7 +31,9 @@ install -d "$STAGE/usr/share/agent-usage" \
            "$STAGE/usr/share/doc/agent-usage" \
            "$STAGE/DEBIAN"
 
-install -m 644 "$SRC"/daemon/*.py         "$STAGE/usr/share/agent-usage/"
+install -d "$STAGE/usr/share/agent-usage/providers"
+install -m 644 "$SRC"/daemon/*.py           "$STAGE/usr/share/agent-usage/"
+install -m 644 "$SRC"/daemon/providers/*.py "$STAGE/usr/share/agent-usage/providers/"
 EXT="$STAGE/usr/share/gnome-shell/extensions/$UUID"
 install -d "$EXT/schemas"
 install -m 644 "$SRC"/extension/*.js "$SRC"/extension/*.json "$SRC"/extension/*.css "$EXT/"
@@ -72,7 +74,6 @@ Priority: optional
 Architecture: all
 Depends: python3 (>= 3.8)
 Recommends: gnome-shell (>= 48)
-Suggests: python3-gi
 Maintainer: $MAINTAINER
 Description: Claude Code and Kimi Code usage in the GNOME top bar
  Shows how much of each plan is spent, when it resets, and how many tokens

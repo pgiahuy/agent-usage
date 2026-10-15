@@ -24,7 +24,9 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl --user disable --now agent-usage.service 2>/dev/null || true
 fi
 rm -f "$CONFIG_HOME/systemd/user/agent-usage.service"
-command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload || true
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload || true
+fi
 
 # Asking the shell to uninstall unloads the extension from the running session
 # and deletes it, so the indicator is gone at once. disable first takes it out
@@ -40,7 +42,9 @@ rm -rf "$DATA_HOME/agent-usage"
 rm -f "$HOME/.local/bin/agent-usage"
 if [ "$purge" -eq 1 ]; then
   rm -rf "$CACHE_HOME/agent-usage"
-  command -v dconf >/dev/null 2>&1 && dconf reset -f /org/gnome/shell/extensions/agent-usage/ || true
+  if command -v dconf >/dev/null 2>&1; then
+    dconf reset -f /org/gnome/shell/extensions/agent-usage/ || true
+  fi
 fi
 
 echo "agent-usage: removed."

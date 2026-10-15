@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Ring gauge rendered as an SVG tray icon.
+"""Ring gauge rendered as an SVG panel icon, one per agent.
 
-The arc tracks Claude's 5-hour window, the number that actually moves during a
-working session, and takes its colour from that window's severity. A dual-ring
-version was tried first and rejected: at the 16-22px the panel actually renders,
-two concentric arcs smear into one blob. The weekly figure lives in the text
-label instead, where it stays readable.
+The arc tracks the agent's 5-hour window, the number that actually moves during
+a working session, and takes its colour from that window's severity. A
+dual-ring version was tried first and rejected: at the 16-22px the panel
+actually renders, two concentric arcs smear into one blob. The weekly figure
+lives in the popup instead, where it stays readable.
 
-AppIndicator caches icons by name, so each distinct state gets its own filename;
-stale files are swept on every write.
+The panel reloads an icon only when its path changes, so each distinct state
+gets its own filename; stale files are swept on every write.
 """
 from __future__ import annotations
 
@@ -31,10 +31,6 @@ OK = "#34d399"  # green
 WARN = "#fbbf24"  # amber
 CRIT = "#f87171"  # red
 UNKNOWN = "#8b90a0"
-
-# Brand accents, used by the panel labels and popup headers.
-CLAUDE = "#e08a6c"
-KIMI = "#0ea5e9"
 
 # Consumed percent -> colour, highest threshold first.
 _TIERS = ((90, CRIT), (75, WARN), (0, OK))
