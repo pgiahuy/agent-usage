@@ -22,9 +22,11 @@ Bars turn amber at 75% consumed and red at 90%.
 - systemd user session (optional: without it, run the collector yourself)
 - Claude Code and/or Kimi Code signed in
 
-There is nothing to configure and no API key to paste: the collector reads the
-token each tool already wrote when you signed in. A tool that is not signed in
-shows token counts only, with no quota bars. Signing in to Claude Code with an
+Nothing needs configuring and there is no API key to paste: the collector
+reads the token each tool already wrote when you signed in. A tool that is not
+signed in shows token counts only, with no quota bars; one that is not
+installed is not shown at all. The Extensions app has the optional settings,
+under Agent Usage: how often quota is checked, and which tools to show. Signing in to Claude Code with an
 API key rather than a subscription also gives no quota bars, because the quota
 endpoint measures a plan.
 

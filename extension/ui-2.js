@@ -46,6 +46,9 @@ const SPIN_STEP = 20;
 // state file. If it is not running, nothing will ever arrive, so stop anyway.
 const SPIN_CAP_S = 12;
 const POLL_SECONDS = 60; // safety net behind the file monitor
+// Named outright rather than read from metadata.json: a session that started
+// before the schema existed still holds the old metadata until the next login.
+const SCHEMA_ID = 'org.gnome.shell.extensions.agent-usage';
 
 const consumed = limit => Math.max(0, Math.min(100, limit.percent ?? 0));
 
@@ -206,8 +209,20 @@ class Indicator extends PanelMenu.Button {
         this.menu.addMenuItem(item);
 
         this._state = null;
+        this._hidden = new Set();
         // The timers outlive the actors they touch unless something stops them.
-        this.connect('destroy', () => this._stopSpin());
+        // The icon is a child, already disposed by the time this runs.
+        this.connect('destroy', () => {
+            this._spinIcon = null;
+            this._stopSpin();
+        });
+        this._render();
+    }
+
+    // The collector also drops hidden tools, but only on its next 20-second
+    // pass; filtering here as well makes the switch take effect at once.
+    setHidden(hidden) {
+        this._hidden = hidden;
         this._render();
     }
 
@@ -257,13 +272,16 @@ class Indicator extends PanelMenu.Button {
 
     _render() {
         this._body.destroy_all_children();
-        const tools = this._state?.tools ?? [];
+        this._spinIcon = null;  // went with the children; _refreshButton makes a new one
+        const tools = (this._state?.tools ?? []).filter(t => !this._hidden.has(t.id));
 
         if (!tools.length) {
             this._pill.update([{accent: '#8b90a0', badge: 'n/a', icon: null}]);
             this._body.add_child(new St.Label({
                 style_class: 'agent-usage-note',
-                text: 'agent-usage daemon is not running.\nsystemctl --user start agent-usage',
+                text: this._state
+                    ? 'No coding agent to show: none is installed,\nor all are hidden in Preferences.'
+                    : 'agent-usage daemon is not running.\nsystemctl --user start agent-usage',
             }));
             return;
         }
@@ -331,12 +349,24 @@ class Indicator extends PanelMenu.Button {
 
 export class AgentUsageUi {
     constructor(extension) {
+        this._extension = extension;
         this._uuid = extension.uuid;
     }
 
     enable() {
         this._indicator = new Indicator();
         Main.panel.addToStatusArea(this._uuid, this._indicator);
+
+        try {
+            this._settings = this._extension.getSettings(SCHEMA_ID);
+            this._settingsId = this._settings.connect('changed::hidden-tools',
+                () => this._applyHidden());
+            this._applyHidden();
+        } catch (e) {
+            // No compiled schema: show every tool, as before settings existed.
+            logError(e, 'agent-usage: settings unavailable');
+            this._settings = null;
+        }
 
         this._file = Gio.File.new_for_path(STATE_PATH);
         this._monitor = this._file.monitor_file(Gio.FileMonitorFlags.NONE, null);
@@ -350,6 +380,10 @@ export class AgentUsageUi {
     }
 
     disable() {
+        if (this._settings) {
+            this._settings.disconnect(this._settingsId);
+            this._settings = null;
+        }
         if (this._debounce) {
             GLib.Source.remove(this._debounce);
             this._debounce = null;
@@ -366,6 +400,10 @@ export class AgentUsageUi {
         this._file = null;
         this._indicator?.destroy();
         this._indicator = null;
+    }
+
+    _applyHidden() {
+        this._indicator?.setHidden(new Set(this._settings.get_strv('hidden-tools')));
     }
 
     // The daemon writes atomically (temp file + rename), which emits several

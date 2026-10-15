@@ -10,5 +10,10 @@
       <summary>Minutes between quota checks</summary>
       <description>How often the collector asks each provider for plan usage. Anthropic rate-limits its usage endpoint hard, which is why this cannot go below two minutes. The Refresh button checks at once regardless.</description>
     </key>
+    <key name="hidden-tools" type="as">
+      <default>[]</default>
+      <summary>Tools not shown</summary>
+      <description>Ids of the tools to leave out: "claude", "kimi". A hidden tool disappears from the popup and the panel, and the collector stops reading its logs and asking its quota API.</description>
+    </key>
   </schema>
 </schemalist>

@@ -7,12 +7,17 @@
 import Adw from 'gi://Adw';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+// tag, as the collector and the state file name it; and the label shown here.
+const TOOLS = [['claude', 'Claude Code'], ['kimi', 'Kimi Code']];
+
 export default class AgentUsagePreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         const settings = this.getSettings();
         window._settings = settings;  // keep it alive as long as the window
 
         const page = new Adw.PreferencesPage();
+        page.add(this._toolsGroup(settings));
+
         const group = new Adw.PreferencesGroup({
             title: 'Collector',
             description: 'Token counts update every 20 seconds regardless.',
@@ -36,5 +41,41 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
         group.add(row);
         page.add(group);
         window.add(page);
+    }
+
+    _toolsGroup(settings) {
+        const group = new Adw.PreferencesGroup({
+            title: 'Tools',
+            description: 'A hidden tool leaves the panel and the popup, and the collector stops reading its logs and asking its quota API.',
+        });
+        const rows = TOOLS.map(([tag, label]) => {
+            const row = new Adw.SwitchRow({title: label});
+            row.connect('notify::active', () => {
+                const hidden = new Set(settings.get_strv('hidden-tools'));
+                if (row.active)
+                    hidden.delete(tag);
+                else
+                    hidden.add(tag);
+                const next = TOOLS.map(([t]) => t).filter(t => hidden.has(t));
+                if (next.join() !== settings.get_strv('hidden-tools').join())
+                    settings.set_strv('hidden-tools', next);
+            });
+            group.add(row);
+            return [tag, row];
+        });
+
+        // The last tool still shown cannot be switched off: an empty panel
+        // would only look broken.
+        const sync = () => {
+            const hidden = new Set(settings.get_strv('hidden-tools'));
+            const shown = rows.filter(([tag]) => !hidden.has(tag)).length;
+            for (const [tag, row] of rows) {
+                row.active = !hidden.has(tag);
+                row.sensitive = !(row.active && shown === 1);
+            }
+        };
+        settings.connect('changed::hidden-tools', sync);
+        sync();
+        return group;
     }
 }

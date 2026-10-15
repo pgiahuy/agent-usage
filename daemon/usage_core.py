@@ -47,6 +47,7 @@ CLAUDE_GLOB = os.path.join(CLAUDE_HOME, "projects", "**", "*.jsonl")
 CLAUDE_CREDS = os.path.join(CLAUDE_HOME, ".credentials.json")
 KIMI_GLOB = os.path.join(KIMI_HOME, "sessions", "*", "*", "agents", "*", "wire.jsonl")
 KIMI_CREDS = os.path.join(KIMI_HOME, "credentials", "kimi-code.json")
+TOOL_HOMES = {"claude": CLAUDE_HOME, "kimi": KIMI_HOME}
 # kimi serialises its own refreshes with proper-lockfile on this target, which
 # means a mkdir of "<target>.lock"; taking the same lock is what keeps the two
 # of us from both spending one rotating refresh token.
@@ -899,11 +900,10 @@ class Collector:
         self._quota = {"claude": None, "kimi": None}
         self._quota_at = 0.0
 
-    def local(self):
-        return {
-            "claude": summarize(self.claude.scan()),
-            "kimi": summarize(self.kimi.scan()),
-        }
+    def local(self, tags=("claude", "kimi")):
+        # A tool left out keeps its offsets, so once it is back the next scan
+        # reads everything written in between and no tokens go missing.
+        return {tag: summarize(getattr(self, tag).scan()) for tag in tags}
 
     def quota(self, max_age=180, force=False):
         if force or time.time() - self._quota_at > max_age or self._quota["claude"] is None:
