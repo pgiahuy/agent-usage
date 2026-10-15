@@ -14,6 +14,7 @@ for arg in "$@"; do
     -h|--help)
       echo "usage: ./uninstall.sh [--purge]"
       echo "  --purge   also delete $CACHE_HOME/agent-usage (cached readings and icons)"
+      echo "            and reset the extension's settings"
       exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
@@ -32,7 +33,10 @@ fi
 rm -rf "$DATA_HOME/gnome-shell/extensions/$UUID"
 rm -rf "$DATA_HOME/agent-usage"
 rm -f "$HOME/.local/bin/agent-usage"
-[ "$purge" -eq 1 ] && rm -rf "$CACHE_HOME/agent-usage"
+if [ "$purge" -eq 1 ]; then
+  rm -rf "$CACHE_HOME/agent-usage"
+  command -v dconf >/dev/null 2>&1 && dconf reset -f /org/gnome/shell/extensions/agent-usage/ || true
+fi
 
 echo "agent-usage: removed."
 [ "$purge" -eq 1 ] || echo "Cached readings left in $CACHE_HOME/agent-usage (--purge removes them)."

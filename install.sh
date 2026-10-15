@@ -93,8 +93,15 @@ esac
 # it can find, so a stale ui-9.js from a previous version would win over the
 # one being installed now.
 rm -rf "$EXT_DIR"
-install -d "$EXT_DIR"
-install -m 644 "$SRC"/extension/* "$EXT_DIR/"
+install -d "$EXT_DIR/schemas"
+install -m 644 "$SRC"/extension/*.js "$SRC"/extension/*.json "$SRC"/extension/*.css "$EXT_DIR/"
+install -m 644 "$SRC"/extension/schemas/*.gschema.xml "$EXT_DIR/schemas/"
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+  glib-compile-schemas "$EXT_DIR/schemas"
+else
+  say "warning: glib-compile-schemas not found (package libglib2.0-bin);"
+  say "         the extension will not load its settings until it is"
+fi
 say "extension: $EXT_DIR"
 
 # --- service --------------------------------------------------------------

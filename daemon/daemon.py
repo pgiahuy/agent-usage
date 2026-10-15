@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 
@@ -25,7 +26,18 @@ STATE_PATH = os.path.join(core.CACHE_DIR, "state.json")
 # keeps the shell from having to spawn a process or send a signal.
 TRIGGER_PATH = os.path.join(core.CACHE_DIR, "refresh-request")
 LOCAL_EVERY = 20
-QUOTA_EVERY = 300
+QUOTA_EVERY = 300  # used when the extension's settings cannot be read
+
+# The user's choices live in the extension's GSettings schema. The collector is
+# standard library only, so it reads them with the gsettings command; the
+# schema is compiled inside the extension, hence --schemadir.
+SCHEMA = "org.gnome.shell.extensions.agent-usage"
+_UUID = "agent-usage@pgiahuy.github.io"
+_SCHEMA_DIRS = (
+    os.path.join(os.environ.get("XDG_DATA_HOME", os.path.join(core.HOME, ".local", "share")),
+                 "gnome-shell", "extensions", _UUID, "schemas"),
+    os.path.join("/usr/share/gnome-shell/extensions", _UUID, "schemas"),
+)
 # An explicit Refresh should mostly bypass the shared quota cache, but not so
 # far that repeated clicking walks into the endpoint's rate limit.
 FORCED_FRESH_S = 30
@@ -146,6 +158,31 @@ def write_state(state):
     os.replace(tmp, STATE_PATH)
 
 
+def setting(key):
+    """One key from the extension's settings, as gsettings prints it, or None."""
+    for schema_dir in _SCHEMA_DIRS:
+        if not os.path.exists(os.path.join(schema_dir, "gschemas.compiled")):
+            continue
+        try:
+            out = subprocess.run(
+                ["gsettings", "--schemadir", schema_dir, "get", SCHEMA, key],
+                capture_output=True, text=True, timeout=5, check=True,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out or None
+    return None
+
+
+def quota_every():
+    # A uint32 prints as "uint32 5".
+    raw = setting("quota-interval")
+    try:
+        return int(raw.split()[-1]) * 60
+    except (AttributeError, ValueError, IndexError):
+        return QUOTA_EVERY
+
+
 def _trigger_mtime():
     try:
         return os.path.getmtime(TRIGGER_PATH)
@@ -165,7 +202,7 @@ def main():
     while _running:
         forced = False
         now = time.time()
-        if now - last_quota >= QUOTA_EVERY or last_quota == 0.0:
+        if now - last_quota >= quota_every() or last_quota == 0.0:
             quota = _fetch_quota()
             last_quota = now
         try:
