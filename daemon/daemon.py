@@ -10,6 +10,7 @@ Writes are atomic (temp file + rename) so a reader never sees a half file.
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import signal
@@ -41,6 +42,14 @@ _SCHEMA_DIRS = (
 # An explicit Refresh should mostly bypass the shared quota cache, but not so
 # far that repeated clicking walks into the endpoint's rate limit.
 FORCED_FRESH_S = 30
+
+# tag, display name, quota fetcher. The tag is the id the settings and the
+# extension use.
+TOOLS = (
+    ("claude", "CLAUDE", core.claude_quota),
+    ("kimi", "KIMI", core.kimi_quota),
+)
+_STARTING = {"ok": False, "why": "starting"}
 
 _running = True
 
@@ -75,9 +84,9 @@ def _models(side):
     ]
 
 
-def _fetch_quota(fresh_for=None, renew=False):
-    """Both providers, never raising. renew lets an expired token be renewed,
-    which only an explicit Refresh asks for.
+def _fetch_quota(tags, fresh_for=None, renew=False):
+    """The given providers, never raising. renew lets an expired token be
+    renewed, which only an explicit Refresh asks for.
 
     An unexpected error escaping here would end the process, and the unit is
     Restart=always, so the daemon would respawn every RestartSec for as long as
@@ -85,7 +94,9 @@ def _fetch_quota(fresh_for=None, renew=False):
     short version that fits its one line.
     """
     out = {}
-    for tag, fetch in (("claude", core.claude_quota), ("kimi", core.kimi_quota)):
+    for tag, _name, fetch in TOOLS:
+        if tag not in tags:
+            continue
         try:
             kw = {"renew": renew}
             if fresh_for is not None:
@@ -120,6 +131,7 @@ def _tool_state(name, side, quota, tag):
         accent=accent,
     )
     return {
+        "id": tag,
         "name": name,
         "accent": accent,
         "limits": limits,
@@ -139,13 +151,14 @@ def _tool_state(name, side, quota, tag):
     }
 
 
-def build_state(collector, quota):
-    local = collector.local()
+def build_state(collector, quota, tags):
+    local = collector.local(tags)
     return {
         "at": time.time(),
         "tools": [
-            _tool_state("CLAUDE", local["claude"], quota["claude"], "claude"),
-            _tool_state("KIMI", local["kimi"], quota["kimi"], "kimi"),
+            _tool_state(name, local[tag], quota.get(tag, _STARTING), tag)
+            for tag, name, _fetch in TOOLS
+            if tag in tags
         ],
     }
 
@@ -183,6 +196,29 @@ def quota_every():
         return QUOTA_EVERY
 
 
+def hidden_tools():
+    # An array of strings prints as "['kimi']", or "@as []" when empty.
+    raw = setting("hidden-tools")
+    if not raw:
+        return set()
+    if raw.startswith("@as "):
+        raw = raw[4:]
+    try:
+        value = ast.literal_eval(raw)
+    except (ValueError, SyntaxError):
+        return set()
+    return {v for v in value if isinstance(v, str)} if isinstance(value, list) else set()
+
+
+def visible_tags():
+    """Tools to collect: not hidden by the user, and installed at all. A tool
+    with no home directory has never run here, and would otherwise show
+    "not signed in" forever."""
+    hidden = hidden_tools()
+    return [tag for tag, _name, _fetch in TOOLS
+            if tag not in hidden and os.path.isdir(core.TOOL_HOMES[tag])]
+
+
 def _trigger_mtime():
     try:
         return os.path.getmtime(TRIGGER_PATH)
@@ -195,18 +231,30 @@ def main():
     signal.signal(signal.SIGINT, _stop)
 
     collector = core.Collector()
-    quota = {"claude": {"ok": False, "why": "starting"}, "kimi": {"ok": False, "why": "starting"}}
+    quota = {}
     last_quota = 0.0
     seen_trigger = _trigger_mtime()
 
     while _running:
         forced = False
         now = time.time()
+        # Read every loop, so hiding a tool stops its scans and quota calls
+        # within one LOCAL_EVERY. The extension hides it on screen at once.
+        tags = visible_tags()
+        # Drop the reading of a hidden tool, so showing it again fetches a
+        # current one instead of drawing the old one as live.
+        quota = {t: q for t, q in quota.items() if t in tags}
         if now - last_quota >= quota_every() or last_quota == 0.0:
-            quota = _fetch_quota()
+            quota = _fetch_quota(tags)
             last_quota = now
+        else:
+            # A tool shown again since the last check gets its reading now
+            # rather than at the end of the interval.
+            missing = [t for t in tags if t not in quota]
+            if missing:
+                quota.update(_fetch_quota(missing))
         try:
-            write_state(build_state(collector, quota))
+            write_state(build_state(collector, quota, tags))
         except Exception as exc:  # a bad cycle must not kill the daemon
             sys.stderr.write("agent-usage: state write failed: %r\n" % (exc,))
 
@@ -218,7 +266,7 @@ def main():
             stamp = _trigger_mtime()
             if stamp != seen_trigger:
                 seen_trigger = stamp
-                quota = _fetch_quota(FORCED_FRESH_S, renew=True)
+                quota = _fetch_quota(tags, FORCED_FRESH_S, renew=True)
                 last_quota = time.time()
                 forced = True
                 break

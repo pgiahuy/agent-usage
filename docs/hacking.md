@@ -74,6 +74,15 @@ in `daemon.py`), and falls back to the built-in default when that fails.
 | Key | Used by | Default |
 | --- | --- | --- |
 | `quota-interval` | collector: minutes between quota checks (2 to 60) | 5 |
+| `hidden-tools` | both: tool ids left out (`claude`, `kimi`) | `[]` |
+
+A hidden tool is dropped twice over. The collector stops scanning its logs and
+calling its quota API on its next 20s pass (`visible_tags()` in `daemon.py`),
+and the extension filters it out of what it draws the moment the setting
+changes, so the switch does not wait for that pass. A tool whose home
+directory (`~/.claude`, `~/.kimi-code`, or the env override) does not exist is
+left out the same way, since it has never run here. Every tool in
+`state.json` carries an `id` for this.
 
 Everything else is still a constant at the top of a file:
 
@@ -83,7 +92,7 @@ Everything else is still a constant at the top of a file:
 | Shared cache TTL, backoff | `QUOTA_FRESH_S`, `_BACKOFF_MIN/MAX` in `usage_core.py` |
 | Colour thresholds | `_TIERS` in `ring.py` |
 | Which Claude limits are shown | `_CLAUDE_SKIP_KINDS` in `usage_core.py` |
-| Card width, bar width, spin speed | top of `extension/ui-1.js` and `stylesheet.css` |
+| Card width, bar width, spin speed | top of the newest `extension/ui-<n>.js` and `stylesheet.css` |
 
 After editing a Python file: `systemctl --user restart agent-usage`.
 
