@@ -12,8 +12,11 @@
 #   docs/apt/agent-usage.asc                             the public key
 #
 # Signing is what makes `apt update` accept the repo without `trusted=yes`.
-# With no secret key present the script still builds a working unsigned repo
-# and prints how to make a key.
+# The key is named explicitly with AGENT_USAGE_GPG_KEY and never picked from
+# the keyring: whichever key signs also has its public half, name and email
+# included, published under docs/apt/, so a personal key must not end up there
+# by accident. Without it the script still builds a working unsigned repo and
+# prints how to set one.
 set -euo pipefail
 umask 022
 
@@ -64,8 +67,7 @@ checksums() {
 } > "$DIST/Release"
 
 # --- signing --------------------------------------------------------------
-KEY=${AGENT_USAGE_GPG_KEY:-$(gpg --list-secret-keys --with-colons 2>/dev/null \
-                          | awk -F: '/^sec:/ {print $5; exit}')}
+KEY=${AGENT_USAGE_GPG_KEY:-}
 if [ -n "${KEY:-}" ]; then
   rm -f "$DIST/Release.gpg" "$DIST/InRelease"
   gpg --default-key "$KEY" --batch --yes --armor --detach-sign \
@@ -76,12 +78,14 @@ if [ -n "${KEY:-}" ]; then
   echo "signed with $KEY"
 else
   cat >&2 <<'EOF'
-No secret GPG key found, so the repository is unsigned: apt will refuse it
-unless the source line says [trusted=yes], which turns off the check that the
-package came from you. To sign it, make a key once and re-run this script:
+AGENT_USAGE_GPG_KEY is not set, so the repository is unsigned: apt will
+refuse it unless the source line says [trusted=yes], which turns off the check
+that the package came from you. Its public key, name and email included, is
+published with the repo, so use a key made for this, once:
 
     gpg --quick-generate-key "Your Name <you@example.com>" default default 5y
-    ./build-apt-repo.sh
+    gpg --list-secret-keys --keyid-format long     # the id after "sec ... /"
+    AGENT_USAGE_GPG_KEY=<that id> ./build-apt-repo.sh
 
 EOF
 fi

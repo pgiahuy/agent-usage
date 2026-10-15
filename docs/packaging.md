@@ -39,7 +39,8 @@ Once, to publish:
 
 ```sh
 gpg --quick-generate-key "Your Name <you@example.com>" default default 5y
-./build-apt-repo.sh
+gpg --list-secret-keys --keyid-format long     # the id after "sec ... /"
+AGENT_USAGE_GPG_KEY=<that id> ./build-apt-repo.sh
 git add docs/apt && git commit -m "publish 1.0.0" && git push
 ```
 
@@ -47,6 +48,10 @@ The signature is the point of the key: it is how apt knows the package came
 from you and not from whoever else could reach the host. Skip it and every
 user has to write `[trusted=yes]` in their source line, which switches that
 check off.
+
+The script signs only with the key `AGENT_USAGE_GPG_KEY` names, never the
+first one in the keyring: the signing key's public half, with its name and
+email, is published in `docs/apt/agent-usage.asc`. Use a key made for this.
 
 Then each user adds the source once:
 

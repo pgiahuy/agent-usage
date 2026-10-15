@@ -87,8 +87,9 @@ $ agent-usage --tray     # AppIndicator fallback, needs PyGObject
 The collector reads, locally, `~/.claude/.credentials.json` and
 `~/.kimi-code/credentials/kimi-code.json` for the access tokens, and
 `~/.claude/projects/**/*.jsonl` and `~/.kimi-code/sessions/**/wire.jsonl` for
-token counts. It talks to `api.anthropic.com` and `api.kimi.com`, and writes
-inside `~/.cache/agent-usage`. No telemetry.
+token counts. It talks to `api.anthropic.com` and `api.kimi.com`, follows no
+redirects with a token attached, and writes inside `~/.cache/agent-usage`,
+which it keeps private to you. No telemetry.
 
 The timed refresh never touches a token. Only the popup's Refresh button
 renews an expired one: for Kimi, the collector refreshes it at `auth.kimi.com`

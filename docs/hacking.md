@@ -22,9 +22,15 @@ and during that time there is no live reading at all.
 
 Kimi does not document a usage endpoint, so the collector probes a short list
 of candidate paths once, remembers the one that answers with percentages, and
-uses only that afterwards. The raw payload is kept at
-`~/.cache/agent-usage/kimi-raw.json`, which is the only record of what that API
-actually sends.
+uses only that afterwards. The usage part of the raw reply (`usage`, `usages`,
+`limits`) is kept at `~/.cache/agent-usage/kimi-raw.json`, the only record of
+what that API actually sends; the rest of the reply carries account and
+billing ids, so only its key names are kept.
+
+Requests that carry a token never follow a redirect: urllib would copy the
+`Authorization` header to wherever the redirect points, any host, even plain
+http. A redirect comes back as an HTTP error instead. The cache directory is
+kept at mode 0700.
 
 ## Tokens
 
