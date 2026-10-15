@@ -63,8 +63,9 @@ def _models(side):
     ]
 
 
-def _fetch_quota(fresh_for=None):
-    """Both providers, never raising.
+def _fetch_quota(fresh_for=None, renew=False):
+    """Both providers, never raising. renew lets an expired token be renewed,
+    which only an explicit Refresh asks for.
 
     An unexpected error escaping here would end the process, and the unit is
     Restart=always, so the daemon would respawn every RestartSec for as long as
@@ -74,7 +75,10 @@ def _fetch_quota(fresh_for=None):
     out = {}
     for tag, fetch in (("claude", core.claude_quota), ("kimi", core.kimi_quota)):
         try:
-            out[tag] = fetch() if fresh_for is None else fetch(fresh_for=fresh_for)
+            kw = {"renew": renew}
+            if fresh_for is not None:
+                kw["fresh_for"] = fresh_for
+            out[tag] = fetch(**kw)
         except Exception as exc:
             sys.stderr.write("agent-usage: %s quota failed: %r\n" % (tag, exc))
             out[tag] = {"ok": False, "why": "error: " + type(exc).__name__}
@@ -177,7 +181,7 @@ def main():
             stamp = _trigger_mtime()
             if stamp != seen_trigger:
                 seen_trigger = stamp
-                quota = _fetch_quota(FORCED_FRESH_S)
+                quota = _fetch_quota(FORCED_FRESH_S, renew=True)
                 last_quota = time.time()
                 forced = True
                 break
