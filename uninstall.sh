@@ -26,10 +26,15 @@ fi
 rm -f "$CONFIG_HOME/systemd/user/agent-usage.service"
 command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload || true
 
+# Asking the shell to uninstall unloads the extension from the running session
+# and deletes it, so the indicator is gone at once. disable first takes it out
+# of the enabled list too. Without a shell to ask, the files are removed and the
+# indicator, already loaded, stays until the next login.
+live_removed=0
 if command -v gnome-extensions >/dev/null 2>&1; then
   gnome-extensions disable "$UUID" 2>/dev/null || true
+  gnome-extensions uninstall "$UUID" 2>/dev/null && live_removed=1
 fi
-
 rm -rf "$DATA_HOME/gnome-shell/extensions/$UUID"
 rm -rf "$DATA_HOME/agent-usage"
 rm -f "$HOME/.local/bin/agent-usage"
@@ -39,5 +44,6 @@ if [ "$purge" -eq 1 ]; then
 fi
 
 echo "agent-usage: removed."
+[ "$live_removed" -eq 1 ] || echo "The panel indicator, if it was showing, disappears at the next login."
 [ "$purge" -eq 1 ] || echo "Cached readings left in $CACHE_HOME/agent-usage (--purge removes them)."
 echo "Nothing was touched in ~/.claude or ~/.kimi-code."

@@ -38,14 +38,12 @@ git clone https://github.com/pgiahuy/agent-usage.git && cd agent-usage
 ```
 
 Then **log out and back in once**: GNOME Shell only looks for new extensions
-when the session starts.
+when the session starts, and offers no way to load one later.
 
-Re-running `./install.sh` is the upgrade path. After an upgrade, reload the
-extension with:
-
-```sh
-gnome-extensions disable agent-usage@pgiahuy.github.io && gnome-extensions enable agent-usage@pgiahuy.github.io
-```
+Re-running `./install.sh` is the upgrade path, and it needs no logout: it
+reloads the panel indicator itself. The exception is an update that changes
+`extension.js`, `metadata.json` or whether there is a preferences page, which
+GNOME Shell reads only at login; the installer says so when that happens.
 
 Everything lands under `$HOME`, no root and no system packages:
 
@@ -66,6 +64,8 @@ see [docs/packaging.md](docs/packaging.md).
 ./uninstall.sh          # leaves the cache
 ./uninstall.sh --purge  # removes it too
 ```
+
+The indicator leaves the panel at once, no logout needed.
 
 ## Terminal
 

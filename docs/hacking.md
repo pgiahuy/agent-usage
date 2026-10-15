@@ -93,7 +93,13 @@ After editing a Python file: `systemctl --user restart agent-usage`.
 life of the shell process, so editing a UI file in place does nothing until the
 next logout. The loader imports the highest-numbered `ui-<n>.js` it finds, so
 the way to ship a UI change to a running session is to copy the file to the
-next number and toggle the extension:
+next number and toggle the extension.
+
+`install.sh` does this itself on an update: when the UI differs from the
+installed one, it installs it as one number above the highest already there,
+then runs disable/enable; when only `stylesheet.css` differs, it keeps the
+name and still toggles. In the repo the UI file keeps whatever number it has.
+By hand, while working on it:
 
 ```sh
 cd ~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io
