@@ -11,10 +11,11 @@ Two pieces, on purpose:
   parses hundreds of megabytes of jsonl and never makes a network call; if the
   collector dies, the panel says so instead of freezing the shell.
 
-Refresh rates: token counts every **20s**, quota percentages every **5 min**,
+Refresh rates: token counts every **20s**, quota percentages every **5 min** by
+default (`quota-interval`, see Configuration),
 and the popup redraws the moment the state file changes (it watches the file,
 so an open popup updates itself). The refresh button forces a quota call
-immediately, without waiting out the five minutes.
+immediately, without waiting out the interval.
 
 The quota interval is deliberately not shorter. Anthropic's usage endpoint
 rate-limits hard; on a 429 the collector backs off from 60s up to 15 minutes,
@@ -54,11 +55,25 @@ timed loop never does.
 
 ## Configuration
 
-There is no settings UI. The knobs are constants at the top of the files:
+User settings live in the extension's GSettings schema,
+`extension/schemas/org.gnome.shell.extensions.agent-usage.gschema.xml`, and are
+edited in the Extensions app (`prefs.js`). The installer and `build-deb.sh`
+compile the schema into the extension's own `schemas/` directory.
+
+The collector reads the same keys, so there is one store and nothing to keep
+in sync. It is standard library only, so it shells out to
+`gsettings --schemadir <extension>/schemas get` once per 20s loop (`setting()`
+in `daemon.py`), and falls back to the built-in default when that fails.
+
+| Key | Used by | Default |
+| --- | --- | --- |
+| `quota-interval` | collector: minutes between quota checks (2 to 60) | 5 |
+
+Everything else is still a constant at the top of a file:
 
 | What | Where |
 | --- | --- |
-| Refresh intervals | `LOCAL_EVERY`, `QUOTA_EVERY` in `daemon.py` |
+| Token count interval | `LOCAL_EVERY` in `daemon.py` |
 | Shared cache TTL, backoff | `QUOTA_FRESH_S`, `_BACKOFF_MIN/MAX` in `usage_core.py` |
 | Colour thresholds | `_TIERS` in `ring.py` |
 | Which Claude limits are shown | `_CLAUDE_SKIP_KINDS` in `usage_core.py` |

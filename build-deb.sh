@@ -22,6 +22,7 @@ chmod 755 "$STAGE"
 trap 'rm -rf "$STAGE"' EXIT
 
 command -v dpkg-deb >/dev/null || { echo "dpkg-deb not found" >&2; exit 1; }
+command -v glib-compile-schemas >/dev/null || { echo "glib-compile-schemas not found (libglib2.0-bin)" >&2; exit 1; }
 
 install -d "$STAGE/usr/share/agent-usage" \
            "$STAGE/usr/bin" \
@@ -31,7 +32,13 @@ install -d "$STAGE/usr/share/agent-usage" \
            "$STAGE/DEBIAN"
 
 install -m 644 "$SRC"/daemon/*.py         "$STAGE/usr/share/agent-usage/"
-install -m 644 "$SRC"/extension/*         "$STAGE/usr/share/gnome-shell/extensions/$UUID/"
+EXT="$STAGE/usr/share/gnome-shell/extensions/$UUID"
+install -d "$EXT/schemas"
+install -m 644 "$SRC"/extension/*.js "$SRC"/extension/*.json "$SRC"/extension/*.css "$EXT/"
+install -m 644 "$SRC"/extension/schemas/*.gschema.xml "$EXT/schemas/"
+# Compiled here rather than in postinst: an extension's schema lives inside
+# the extension, so the compiled file is just another file the package owns.
+glib-compile-schemas "$EXT/schemas"
 install -m 644 "$SRC/systemd/agent-usage.service" "$STAGE/usr/lib/systemd/user/agent-usage.service"
 install -m 644 "$SRC/README.md"           "$STAGE/usr/share/doc/agent-usage/README.md"
 install -d "$STAGE/usr/share/doc/agent-usage/docs"
