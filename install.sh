@@ -89,12 +89,51 @@ case ":$PATH:" in
 esac
 
 # --- extension ------------------------------------------------------------
-# Wiped rather than merged: the loader imports the highest-numbered ui-<n>.js
-# it can find, so a stale ui-9.js from a previous version would win over the
-# one being installed now.
+# The running shell has imported ui-<n>.js by its file name and will never
+# re-read that name, so an update that changes the UI is installed under a
+# number above every one already there; extension.js, the loader, then picks
+# it up on disable/enable, below, with no logout. An unchanged UI keeps its
+# name, so nothing reloads for no reason.
+ui_num() { local f; f=$(basename "$1"); f=${f#ui-}; echo "${f%.js}"; }
+newest_ui() {
+  local f best="" n=-1
+  for f in "$1"/ui-*.js; do
+    [ -e "$f" ] || continue
+    [ "$(ui_num "$f")" -gt "$n" ] 2>/dev/null && { n=$(ui_num "$f"); best=$f; }
+  done
+  echo "$best"
+}
+src_ui=$(newest_ui "$SRC/extension")
+ui_target=$(ui_num "$src_ui")
+old_ui=$(newest_ui "$EXT_DIR")
+reload_ui=0
+needs_login=0
+if [ -n "$old_ui" ]; then
+  old_n=$(ui_num "$old_ui")
+  if cmp -s "$src_ui" "$old_ui"; then
+    ui_target=$old_n
+  else
+    reload_ui=1
+    [ "$ui_target" -gt "$old_n" ] || ui_target=$((old_n + 1))
+  fi
+  # The stylesheet needs no new name: enable re-reads it.
+  cmp -s "$SRC/extension/stylesheet.css" "$EXT_DIR/stylesheet.css" || reload_ui=1
+  # What the shell read once, at login, and does not re-read on enable: the
+  # loader module, the metadata, and whether prefs.js exists at all.
+  for f in extension.js metadata.json; do
+    cmp -s "$SRC/extension/$f" "$EXT_DIR/$f" || needs_login=1
+  done
+  [ -e "$EXT_DIR/prefs.js" ] || needs_login=1
+fi
+
+# Wiped rather than merged, so no stale ui-<n>.js outranks the one written now.
 rm -rf "$EXT_DIR"
 install -d "$EXT_DIR/schemas"
-install -m 644 "$SRC"/extension/*.js "$SRC"/extension/*.json "$SRC"/extension/*.css "$EXT_DIR/"
+for f in "$SRC"/extension/*.js "$SRC"/extension/*.json "$SRC"/extension/*.css; do
+  case $(basename "$f") in ui-*.js) continue ;; esac
+  install -m 644 "$f" "$EXT_DIR/"
+done
+install -m 644 "$src_ui" "$EXT_DIR/ui-$ui_target.js"
 install -m 644 "$SRC"/extension/schemas/*.gschema.xml "$EXT_DIR/schemas/"
 if command -v glib-compile-schemas >/dev/null 2>&1; then
   glib-compile-schemas "$EXT_DIR/schemas"
@@ -140,9 +179,23 @@ enable_in_dconf() {
 
 echo
 if command -v gnome-extensions >/dev/null 2>&1 && gnome-extensions info "$UUID" >/dev/null 2>&1; then
+  # Known to the running shell, so this is an update: a disable/enable loads
+  # the new ui-<n>.js and re-reads stylesheet.css.
+  if [ "$reload_ui" -eq 1 ]; then
+    gnome-extensions disable "$UUID" 2>/dev/null || true
+  fi
   gnome-extensions enable "$UUID" || true
-  echo "Done. The panel indicator is enabled."
-  echo "If it does not appear, log out and back in once."
+  if [ "$needs_login" -eq 1 ]; then
+    [ "$reload_ui" -eq 1 ] && echo "Done. The panel indicator has been reloaded with the new version,"
+    [ "$reload_ui" -eq 1 ] || echo "Done."
+    echo "but extension.js, metadata.json or the preferences page changed, and"
+    echo "GNOME Shell reads those only at login: log out and back in once to"
+    echo "finish the update."
+  elif [ "$reload_ui" -eq 1 ]; then
+    echo "Done. The panel indicator has been reloaded with the new version."
+  else
+    echo "Done. The panel indicator is enabled."
+  fi
 elif enable_in_dconf; then
   echo "Done. Log out and back in once; the indicator comes up with the session."
   echo "(GNOME Shell only looks for new extensions when the session starts.)"
