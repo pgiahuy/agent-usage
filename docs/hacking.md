@@ -119,6 +119,13 @@ in sync. It is standard library only, so it shells out to
 | --- | --- | --- |
 | `quota-interval` | collector: minutes between quota checks (2 to 60) | 5 |
 | `hidden-tools` | both: agent ids left out (`claude`, `kimi`) | `[]` |
+| `popup-layout` | extension: `tiles`, `compact` or `numbers` | `tiles` |
+| `pill-style` | extension: `ring`, or `text` (initial and percentage) | `ring` |
+
+The layouts are renderer functions in one UI module (`LAYOUTS` in
+`ui-<n>.js`), not separate files: the file number is the reload mechanism, not
+a menu. Each fills one agent's block under the shared header, so the refresh
+button, the stale note and the no-quota case behave the same in all of them.
 
 A hidden agent is dropped twice over. The collector stops scanning its logs and
 calling its quota API on its next 20s pass (`settings.visible()`), and the

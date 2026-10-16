@@ -210,3 +210,71 @@
   font-size: 10.5px;
   color: #8b90a0;
 }
+
+/* Compact layout ----------------------------------------------------------- */
+
+/* One row per limit: name, bar, number, reset time. 48 + 8 + 104 + 8 + 34 + 8
+   leaves the reset time 62px of the 272px card. */
+.agent-usage-crow {
+  spacing: 8px;
+  padding: 5px 2px;
+}
+
+.agent-usage-cname {
+  width: 48px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cfd3dd;
+}
+
+.agent-usage-ctrack {
+  /* Must match COMPACT_TRACK_W in ui-<n>.js. */
+  width: 104px;
+  height: 4px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.agent-usage-cfill {
+  height: 4px;
+  border-radius: 999px;
+}
+
+.agent-usage-cpct {
+  width: 34px;
+  font-size: 12px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  text-align: right;
+}
+
+.agent-usage-cstats {
+  padding: 6px 2px 0 2px;
+  font-size: 9.5px;
+  color: #8b90a0;
+  font-feature-settings: "tnum";
+}
+
+/* Numbers layout ----------------------------------------------------------- */
+
+.agent-usage-num-row {
+  margin-top: 6px;
+}
+
+/* The cells reuse the duo tile; this one has no margin of its own, the row
+   carries it, so two rows of cells are spaced like two rows of tiles. */
+.agent-usage-num-row .agent-usage-tile {
+  margin-top: 0;
+}
+
+.agent-usage-big {
+  font-size: 26px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+.agent-usage-big-unit {
+  font-size: 13px;
+  font-weight: 600;
+  padding-bottom: 4px;
+}
