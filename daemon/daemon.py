@@ -3,53 +3,37 @@
 
 The GNOME Shell extension is pure presentation: it reads this file and draws.
 Keeping the log parsing and the quota calls here means the shell process never
-touches 400 MB of jsonl, and the numbers stay in the one place they have been
-verified.
+touches hundreds of megabytes of jsonl, and the numbers stay in the one place
+they have been verified.
 
 Writes are atomic (temp file + rename) so a reader never sees a half file.
 """
 from __future__ import annotations
 
-import ast
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fmt  # noqa: E402
+import paths  # noqa: E402
+import quota  # noqa: E402
 import ring  # noqa: E402
-import usage_core as core  # noqa: E402
+import scan  # noqa: E402
+import settings  # noqa: E402
+from collector import Collector  # noqa: E402
 
-STATE_PATH = os.path.join(core.CACHE_DIR, "state.json")
+STATE_PATH = os.path.join(paths.CACHE_DIR, "state.json")
 # The extension touches this to ask for an immediate refresh; a watched file
 # keeps the shell from having to spawn a process or send a signal.
-TRIGGER_PATH = os.path.join(core.CACHE_DIR, "refresh-request")
+TRIGGER_PATH = os.path.join(paths.CACHE_DIR, "refresh-request")
 LOCAL_EVERY = 20
 QUOTA_EVERY = 300  # used when the extension's settings cannot be read
-
-# The user's choices live in the extension's GSettings schema. The collector is
-# standard library only, so it reads them with the gsettings command; the
-# schema is compiled inside the extension, hence --schemadir.
-SCHEMA = "org.gnome.shell.extensions.agent-usage"
-_UUID = "agent-usage@pgiahuy.github.io"
-_SCHEMA_DIRS = (
-    os.path.join(os.environ.get("XDG_DATA_HOME", os.path.join(core.HOME, ".local", "share")),
-                 "gnome-shell", "extensions", _UUID, "schemas"),
-    os.path.join("/usr/share/gnome-shell/extensions", _UUID, "schemas"),
-)
 # An explicit Refresh should mostly bypass the shared quota cache, but not so
 # far that repeated clicking walks into the endpoint's rate limit.
 FORCED_FRESH_S = 30
-
-# tag, display name, quota fetcher. The tag is the id the settings and the
-# extension use.
-TOOLS = (
-    ("claude", "CLAUDE", core.claude_quota),
-    ("kimi", "KIMI", core.kimi_quota),
-)
-_STARTING = {"ok": False, "why": "starting"}
 
 _running = True
 
@@ -61,32 +45,27 @@ def _stop(_sig, _frm):
 
 def _totals(side, key):
     t = side[key]["total"]
-    total = core.total_tokens(t)
+    total = scan.total_tokens(t)
     # tokens_h is pre-formatted here so the shell process never has to reproduce
     # the abbreviation rules and drift from what the CLI prints.
     return {
         "tokens": total,
-        "tokens_h": core.fmt_tokens(total),
+        "tokens_h": fmt.fmt_tokens(total),
         "reqs": t["reqs"],
-        **{f: t[f] for f in core.FIELDS},
+        **{f: t[f] for f in scan.FIELDS},
     }
 
 
 def _models(side):
-    ranked = sorted(side["today"]["by_model"].items(), key=lambda kv: -core.total_tokens(kv[1]))
+    ranked = sorted(side["today"]["by_model"].items(), key=lambda kv: -scan.total_tokens(kv[1]))
     return [
-        {
-            "name": core.short_model(m),
-            "tokens": core.total_tokens(t),
-            "reqs": t["reqs"],
-        }
+        {"name": fmt.short_model(m), "tokens": scan.total_tokens(t), "reqs": t["reqs"]}
         for m, t in ranked[:4]
     ]
 
 
-def _fetch_quota(tags, fresh_for=None, renew=False):
-    """The given providers, never raising. renew lets an expired token be
-    renewed, which only an explicit Refresh asks for.
+def fetch_quota(providers, fresh_for=None, renew=False):
+    """Readings for the given providers, never raising.
 
     An unexpected error escaping here would end the process, and the unit is
     Restart=always, so the daemon would respawn every RestartSec for as long as
@@ -94,54 +73,51 @@ def _fetch_quota(tags, fresh_for=None, renew=False):
     short version that fits its one line.
     """
     out = {}
-    for tag, _name, fetch in TOOLS:
-        if tag not in tags:
-            continue
+    for p in providers:
+        kw = {"renew": renew}
+        if fresh_for is not None:
+            kw["fresh_for"] = fresh_for
         try:
-            kw = {"renew": renew}
-            if fresh_for is not None:
-                kw["fresh_for"] = fresh_for
-            out[tag] = fetch(**kw)
+            out[p.tag] = quota.fetch(p, **kw)
         except Exception as exc:
-            sys.stderr.write("agent-usage: %s quota failed: %r\n" % (tag, exc))
-            out[tag] = {"ok": False, "why": "error: " + type(exc).__name__}
+            sys.stderr.write("agent-usage: %s quota failed: %r\n" % (p.tag, exc))
+            out[p.tag] = {"ok": False, "why": "error: " + type(exc).__name__}
     return out
 
 
-def _tool_state(name, side, quota, tag):
-    raw_limits, live, why = core.live_limits(quota)
+def tool_state(provider, side, reading):
+    raw_limits, live, why = quota.live_limits(reading)
     limits = [
         {
             "label": lim["label"],
             "percent": lim["percent"] or 0,
             "severity": lim["severity"],
             "colour": ring.severity_color(lim["percent"], lim["severity"]),
-            "resets": core.fmt_reset(lim["resets_at"]),
+            "resets": fmt.fmt_reset(lim["resets_at"]),
         }
         for lim in raw_limits
     ]
-    session = next((l for l in limits if l["label"].startswith("5-hour")), None)
-    accent = ring.CLAUDE if tag == "claude" else ring.KIMI
+    session = next((lim for lim in limits if lim["label"].startswith("5-hour")), None)
     icon = ring.write_icon(
-        core.CACHE_DIR,
+        paths.CACHE_DIR,
         session["percent"] if session else 0,
         session["severity"] if session else "normal",
         known=session is not None,
-        tag=tag,
-        accent=accent,
+        tag=provider.tag,
+        accent=provider.accent,
     )
     return {
-        "id": tag,
-        "name": name,
-        "accent": accent,
+        "id": provider.tag,
+        "name": provider.name,
+        "accent": provider.accent,
         "limits": limits,
         "live": live,
         "why": why,
         "icon": icon,
         # What the panel shows next to the ring: the 5-hour percent when we have
         # it, otherwise today's token volume, never a fabricated percentage.
-        "badge": ("%d%%" % session["percent"]) if session else core.fmt_tokens(
-            core.total_tokens(side["today"]["total"])
+        "badge": ("%d%%" % session["percent"]) if session else fmt.fmt_tokens(
+            scan.total_tokens(side["today"]["total"])
         ),
         "badge_is_percent": session is not None,
         "stale": not live and bool(limits),
@@ -151,72 +127,23 @@ def _tool_state(name, side, quota, tag):
     }
 
 
-def build_state(collector, quota, tags):
-    local = collector.local(tags)
+_STARTING = {"ok": False, "why": "starting"}
+
+
+def build_state(collector, readings, providers):
+    local = collector.local(providers)
     return {
         "at": time.time(),
-        "tools": [
-            _tool_state(name, local[tag], quota.get(tag, _STARTING), tag)
-            for tag, name, _fetch in TOOLS
-            if tag in tags
-        ],
+        "tools": [tool_state(p, local[p.tag], readings.get(p.tag, _STARTING)) for p in providers],
     }
 
 
 def write_state(state):
-    core.ensure_cache_dir()
+    paths.ensure_cache_dir()
     tmp = STATE_PATH + ".tmp"
     with open(tmp, "w") as fh:
         json.dump(state, fh)
     os.replace(tmp, STATE_PATH)
-
-
-def setting(key):
-    """One key from the extension's settings, as gsettings prints it, or None."""
-    for schema_dir in _SCHEMA_DIRS:
-        if not os.path.exists(os.path.join(schema_dir, "gschemas.compiled")):
-            continue
-        try:
-            out = subprocess.run(
-                ["gsettings", "--schemadir", schema_dir, "get", SCHEMA, key],
-                capture_output=True, text=True, timeout=5, check=True,
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return out or None
-    return None
-
-
-def quota_every():
-    # A uint32 prints as "uint32 5".
-    raw = setting("quota-interval")
-    try:
-        return int(raw.split()[-1]) * 60
-    except (AttributeError, ValueError, IndexError):
-        return QUOTA_EVERY
-
-
-def hidden_tools():
-    # An array of strings prints as "['kimi']", or "@as []" when empty.
-    raw = setting("hidden-tools")
-    if not raw:
-        return set()
-    if raw.startswith("@as "):
-        raw = raw[4:]
-    try:
-        value = ast.literal_eval(raw)
-    except (ValueError, SyntaxError):
-        return set()
-    return {v for v in value if isinstance(v, str)} if isinstance(value, list) else set()
-
-
-def visible_tags():
-    """Tools to collect: not hidden by the user, and installed at all. A tool
-    with no home directory has never run here, and would otherwise show
-    "not signed in" forever."""
-    hidden = hidden_tools()
-    return [tag for tag, _name, _fetch in TOOLS
-            if tag not in hidden and os.path.isdir(core.TOOL_HOMES[tag])]
 
 
 def _trigger_mtime():
@@ -230,32 +157,33 @@ def main():
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 
-    collector = core.Collector()
-    quota = {}
+    collector = Collector()
+    readings = {}
     last_quota = 0.0
     seen_trigger = _trigger_mtime()
 
     while _running:
         forced = False
         now = time.time()
-        # Read every loop, so hiding a tool stops its scans and quota calls
+        # Read every pass, so hiding a tool stops its scans and quota calls
         # within one LOCAL_EVERY. The extension hides it on screen at once.
-        tags = visible_tags()
+        providers = settings.visible()
+        tags = {p.tag for p in providers}
         # Drop the reading of a hidden tool, so showing it again fetches a
         # current one instead of drawing the old one as live.
-        quota = {t: q for t, q in quota.items() if t in tags}
-        if now - last_quota >= quota_every() or last_quota == 0.0:
-            quota = _fetch_quota(tags)
+        readings = {t: r for t, r in readings.items() if t in tags}
+        if now - last_quota >= settings.quota_every(QUOTA_EVERY) or last_quota == 0.0:
+            readings = fetch_quota(providers)
             last_quota = now
         else:
             # A tool shown again since the last check gets its reading now
             # rather than at the end of the interval.
-            missing = [t for t in tags if t not in quota]
+            missing = [p for p in providers if p.tag not in readings]
             if missing:
-                quota.update(_fetch_quota(missing))
+                readings.update(fetch_quota(missing))
         try:
-            write_state(build_state(collector, quota, tags))
-        except Exception as exc:  # a bad cycle must not kill the daemon
+            write_state(build_state(collector, readings, providers))
+        except Exception as exc:  # a bad pass must not kill the daemon
             sys.stderr.write("agent-usage: state write failed: %r\n" % (exc,))
 
         # Wake every second so SIGTERM lands promptly and a Refresh click is
@@ -266,7 +194,7 @@ def main():
             stamp = _trigger_mtime()
             if stamp != seen_trigger:
                 seen_trigger = stamp
-                quota = _fetch_quota(tags, FORCED_FRESH_S, renew=True)
+                readings = fetch_quota(providers, FORCED_FRESH_S, renew=True)
                 last_quota = time.time()
                 forced = True
                 break

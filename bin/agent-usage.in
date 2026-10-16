@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# agent-usage            print the Claude + Kimi usage table in the terminal
-# agent-usage --json     the same reading as JSON
-# agent-usage --daemon   background collector; writes ~/.cache/agent-usage/state.json
-#                     for the GNOME extension to draw (normally run by systemd)
-# agent-usage --tray     AppIndicator fallback for sessions without the extension
-#
-# @PYTHON@ and @APP_DIR@ are filled in by install.sh.
+# The agent-usage command. @PYTHON@ and @APP_DIR@ are filled in by install.sh
+# and build-deb.sh.
 set -euo pipefail
 APP="@APP_DIR@"
 PY="@PYTHON@"
 
 case "${1:-}" in
   --daemon) shift; exec "$PY" "$APP/daemon.py" "$@" ;;
-  --tray)   shift; exec "$PY" "$APP/indicator.py" "$@" ;;
+  -h|--help)
+    cat <<'EOF'
+usage: agent-usage [--json | --daemon]
+
+  (no option)   print each coding agent's quota and token usage
+  --json        the same reading as JSON
+  --daemon      run the collector that keeps ~/.cache/agent-usage/state.json
+                current for the GNOME extension (normally started by systemd)
+EOF
+    exit 0 ;;
 esac
 exec "$PY" "$APP/cli.py" "$@"

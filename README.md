@@ -81,7 +81,6 @@ $ agent-usage
 
 $ agent-usage --json     # same reading, machine readable
 $ agent-usage --daemon   # the collector, in the foreground
-$ agent-usage --tray     # AppIndicator fallback, needs PyGObject
 ```
 
 ## Data and privacy
@@ -124,10 +123,6 @@ clears itself. The last known reading stays on screen, marked as such.
 **Kimi says "token expired".** Press Refresh in the popup. If it says "kimi is
 running", the token renews on its own the next time that session talks to
 Kimi.
-
-**`--tray` fails to start.** That fallback needs PyGObject, which pyenv and
-conda interpreters do not have. Point the `PY=` line of `~/.local/bin/agent-usage`
-at `/usr/bin/python3`.
 
 ## Development
 

@@ -8,6 +8,7 @@
 # `apt install` downloads it from there.
 
 __pycache__/
+.ruff_cache/
 *.pyc
 
 # Editors

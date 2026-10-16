@@ -32,23 +32,18 @@ done
 say() { printf '  %s\n' "$*"; }
 
 # --- python ---------------------------------------------------------------
-# The collector is standard library only, so any python3 will run it. The
-# optional --tray fallback needs PyGObject, which on most distributions only
-# the system interpreter has: a pyenv or conda python will not do. Prefer an
-# interpreter that has it, and fall back to whatever is on PATH.
+# The collector is standard library only, so any python3 >= 3.8 runs it. The
+# system interpreter comes first: a pyenv or conda python on PATH can be
+# switched or removed later, and the service would stop with it.
 pick_python() {
-  local best=""
+  local candidate
   for candidate in /usr/bin/python3 "$(command -v python3 || true)"; do
     [ -x "$candidate" ] || continue
     "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' 2>/dev/null || continue
-    if "$candidate" -c 'import gi' 2>/dev/null; then
-      echo "$candidate"
-      return 0
-    fi
-    [ -n "$best" ] || best=$candidate
+    echo "$candidate"
+    return 0
   done
-  [ -n "$best" ] || return 1
-  echo "$best"
+  return 1
 }
 
 PYTHON=$(pick_python) || {
@@ -73,9 +68,11 @@ else
 fi
 
 # --- collector ------------------------------------------------------------
-install -d "$APP_DIR" "$BIN_DIR" "$UNIT_DIR"
+# Wiped first, so a module a newer version dropped does not linger.
+rm -rf "$APP_DIR"
+install -d "$APP_DIR/providers" "$BIN_DIR" "$UNIT_DIR"
 install -m 644 "$SRC"/daemon/*.py "$APP_DIR/"
-rm -rf "$APP_DIR/__pycache__"
+install -m 644 "$SRC"/daemon/providers/*.py "$APP_DIR/providers/"
 
 sed -e "s|@PYTHON@|$PYTHON|" -e "s|@APP_DIR@|$APP_DIR|" \
     "$SRC/bin/agent-usage.in" > "$BIN_DIR/agent-usage"

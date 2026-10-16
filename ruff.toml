@@ -1,0 +1,17 @@
+# The rules are named outright: ruff's default set changes between releases,
+# and CI should not start failing because a new release was published.
+target-version = "py38"
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "B", "I"]
+
+[lint.isort]
+# daemon/ is put on sys.path at run time, so its modules import as first-party.
+known-first-party = ["cache", "collector", "fmt", "net", "paths", "providers", "quota", "ring",
+                     "scan", "settings", "_env"]
+
+[lint.per-file-ignores]
+# Every test imports _env first: it points the collector's paths at a temp dir,
+# which has to happen before any collector module is imported.
+"tests/*" = ["I001"]

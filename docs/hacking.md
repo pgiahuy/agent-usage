@@ -4,18 +4,19 @@
 
 Two pieces, on purpose:
 
-- **The collector** (`daemon.py`) does all the work: it parses the logs, calls
-  the quota endpoints, renders the ring icons, and writes one small JSON file
-  to `~/.cache/agent-usage/state.json`.
-- **The extension** only reads that file and draws it. The compositor never
-  parses hundreds of megabytes of jsonl and never makes a network call; if the
-  collector dies, the panel says so instead of freezing the shell.
+- **The collector** (`daemon/`, run as `agent-usage --daemon`) does all the
+  work: it parses the logs, calls the quota endpoints, renders the ring icons,
+  and writes one small JSON file to `~/.cache/agent-usage/state.json`.
+- **The extension** (`extension/`) only reads that file and draws it. The
+  compositor never parses hundreds of megabytes of jsonl and never makes a
+  network call; if the collector dies, the panel says so instead of freezing
+  the shell.
 
 Refresh rates: token counts every **20s**, quota percentages every **5 min** by
-default (`quota-interval`, see Configuration),
-and the popup redraws the moment the state file changes (it watches the file,
-so an open popup updates itself). The refresh button forces a quota call
-immediately, without waiting out the interval.
+default (`quota-interval`, see Configuration), and the popup redraws the moment
+the state file changes (it watches the file, so an open popup updates itself).
+The refresh button forces a quota call immediately, without waiting out the
+interval.
 
 The quota interval is deliberately not shorter. Anthropic's usage endpoint
 rate-limits hard; on a 429 the collector backs off from 60s up to 15 minutes,
@@ -33,9 +34,52 @@ Requests that carry a token never follow a redirect: urllib would copy the
 http. A redirect comes back as an HTTP error instead. The cache directory is
 kept at mode 0700.
 
+## Layout
+
+```
+daemon/
+  daemon.py       the loop: which agents, when to ask, state.json
+  cli.py          the terminal view (agent-usage, agent-usage --json)
+  collector.py    one log scanner per agent, kept alive between passes
+  scan.py         incremental jsonl scanning, per-day and per-model totals
+  quota.py        the quota flow every agent shares: cache, token, renew, backoff
+  cache.py        small JSON files in ~/.cache/agent-usage
+  net.py          HTTP without redirects
+  settings.py     the user's choices, read from GSettings
+  paths.py        where each agent and this tool keep their files
+  fmt.py          number, time and bar formatting
+  ring.py         the panel's ring icon
+  providers/      one module per agent; the registry is __init__.py
+extension/
+  extension.js    loader only: imports the newest ui-<n>.js
+  ui-<n>.js       the panel pill and the popup
+  prefs.js        the Preferences page
+  schemas/        the GSettings schema
+tests/            unittest, standard library only
+```
+
+## Adding an agent
+
+Everything about one agent lives in `daemon/providers/<name>.py`, which builds
+a `Provider` (`providers/base.py` documents each field):
+
+- where its session logs are, and how to turn one log line into
+  `(epoch, model, dedup_key, inp, out, cache_read, cache_write)`;
+- how to read its access token, how to ask its quota API, and how to renew an
+  expired token (or return a reason when it cannot be renewed).
+
+Then add it to `PROVIDERS` in `providers/__init__.py`, and its id to the
+`hidden-tools` description and the `TOOLS` list in `extension/prefs.js`. The
+extension draws whatever `state.json` lists, so it needs no other change.
+
+The part that bites is deduplication: Claude replays earlier messages into a
+resumed session's log, and Kimi writes both a per-turn and a per-session usage
+record. Counting either wrong roughly doubles the totals, so give `extract()`
+a dedup key and a test with a replayed line.
+
 ## Tokens
 
-The collector reads the token each tool wrote when you signed in:
+The collector reads the token each agent wrote when you signed in:
 
 - `~/.claude/.credentials.json`: Claude Code refreshes this as you use it, so
   it is normally valid and the Claude bars are always there.
@@ -43,21 +87,21 @@ The collector reads the token each tool wrote when you signed in:
   minutes, so on the timed loop the Kimi bars appear only if you have run
   `kimi` recently.
 
-An explicit Refresh renews an expired token (`renew=True` in `daemon.py`); the
-timed loop never does.
+An explicit Refresh renews an expired token (`renew=True` in `quota.fetch()`);
+the timed loop never does.
 
-- Kimi: the refresh token rotates, so a refresh racing Kimi Code's own would
-  leave one side holding a dead token and the user signed out.
-  `renew_kimi_token` therefore refuses while any `kimi` process runs, takes
-  the lock Kimi itself uses (proper-lockfile, i.e. a mkdir of
+- Kimi (`providers/kimi.py`, `renew()`): the refresh token rotates, so a
+  refresh racing Kimi Code's own would leave one side holding a dead token and
+  the user signed out. It therefore refuses while any `kimi` process runs,
+  takes the lock Kimi itself uses (proper-lockfile, i.e. a mkdir of
   `~/.kimi-code/oauth/kimi-code.lock`), backs off if Kimi holds it, re-reads
   the file under the lock, and writes the result back atomically with mode
   0600. proper-lockfile treats a lock untouched for 5s as stale, so the
-  request timeout keeps the hold under that.
-- Claude: the collector never refreshes as Claude Code. `renew_claude_token`
-  runs `claude auth status`, and if that leaves the token expired, one
-  `claude -p ok` on haiku with no tools, no MCP servers and no saved session.
-  That call can take a while, and the daemon loop waits for it.
+  request timeout keeps the hold under that. The OAuth host must be https.
+- Claude (`providers/claude.py`, `renew()`): the collector never refreshes as
+  Claude Code. It runs `claude auth status`, and if that leaves the token
+  expired, one `claude -p ok` on haiku with no tools, no MCP servers and no
+  saved session. That call can take a while, and the daemon loop waits for it.
 
 ## Configuration
 
@@ -68,33 +112,46 @@ compile the schema into the extension's own `schemas/` directory.
 
 The collector reads the same keys, so there is one store and nothing to keep
 in sync. It is standard library only, so it shells out to
-`gsettings --schemadir <extension>/schemas get` once per 20s loop (`setting()`
-in `daemon.py`), and falls back to the built-in default when that fails.
+`gsettings --schemadir <extension>/schemas get` once per 20s pass
+(`settings.py`), and falls back to the built-in default when that fails.
 
 | Key | Used by | Default |
 | --- | --- | --- |
 | `quota-interval` | collector: minutes between quota checks (2 to 60) | 5 |
-| `hidden-tools` | both: tool ids left out (`claude`, `kimi`) | `[]` |
+| `hidden-tools` | both: agent ids left out (`claude`, `kimi`) | `[]` |
 
-A hidden tool is dropped twice over. The collector stops scanning its logs and
-calling its quota API on its next 20s pass (`visible_tags()` in `daemon.py`),
-and the extension filters it out of what it draws the moment the setting
-changes, so the switch does not wait for that pass. A tool whose home
-directory (`~/.claude`, `~/.kimi-code`, or the env override) does not exist is
-left out the same way, since it has never run here. Every tool in
-`state.json` carries an `id` for this.
+A hidden agent is dropped twice over. The collector stops scanning its logs and
+calling its quota API on its next 20s pass (`settings.visible()`), and the
+extension filters it out of what it draws the moment the setting changes, so
+the switch does not wait for that pass. An agent whose home directory
+(`~/.claude`, `~/.kimi-code`, or the env override) does not exist is left out
+the same way, since it has never run here. Every tool in `state.json` carries
+an `id` for this.
 
 Everything else is still a constant at the top of a file:
 
 | What | Where |
 | --- | --- |
 | Token count interval | `LOCAL_EVERY` in `daemon.py` |
-| Shared cache TTL, backoff | `QUOTA_FRESH_S`, `_BACKOFF_MIN/MAX` in `usage_core.py` |
+| Shared cache TTL, backoff | `FRESH_S`, `_BACKOFF_MIN/MAX` in `cache.py` |
 | Colour thresholds | `_TIERS` in `ring.py` |
-| Which Claude limits are shown | `_CLAUDE_SKIP_KINDS` in `usage_core.py` |
+| Which Claude limits are shown | `_SKIP_KINDS` in `providers/claude.py` |
 | Card width, bar width, spin speed | top of the newest `extension/ui-<n>.js` and `stylesheet.css` |
 
 After editing a Python file: `systemctl --user restart agent-usage`.
+
+## Tests and checks
+
+```sh
+python3 -m unittest discover -s tests          # every test, no network
+ruff check daemon tests                        # ruff.toml names the rules
+shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in
+```
+
+The tests point every path the collector touches (cache, `~/.claude`,
+`~/.kimi-code`, the GSettings schema) at a temporary directory, and the HTTP
+ones talk to local servers, so they never read your real tokens or logs. CI
+runs all of the above on Python 3.8, 3.12 and 3.13, plus a .deb build.
 
 ## Shipping a UI change
 
@@ -112,7 +169,7 @@ By hand, while working on it:
 
 ```sh
 cd ~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io
-cp ui-1.js ui-2.js && $EDITOR ui-2.js
+cp ui-2.js ui-3.js && $EDITOR ui-3.js
 gnome-extensions disable agent-usage@pgiahuy.github.io && gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
 
