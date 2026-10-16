@@ -174,15 +174,47 @@ enable_in_dconf() {
   esac
 }
 
+ext_state() {
+  gnome-extensions info "$UUID" 2>/dev/null | sed -n 's/^ *State: //p'
+}
+
+# The shell carries out a disable or an enable after the command has returned.
+# An enable sent while the disable is still under way can be lost, leaving the
+# extension switched on in the settings but INACTIVE, so each step waits for
+# the state it asked for (up to 5s) before the next one goes out.
+wait_state() {
+  local tries=50
+  while [ "$tries" -gt 0 ]; do
+    [ "$(ext_state)" = "$1" ] && return 0
+    sleep 0.1
+    tries=$((tries - 1))
+  done
+  return 1
+}
+
+reload_extension() {
+  gnome-extensions disable "$UUID" 2>/dev/null || true
+  wait_state INACTIVE || true
+  gnome-extensions enable "$UUID" || true
+  wait_state ACTIVE
+}
+
 echo
 if command -v gnome-extensions >/dev/null 2>&1 && gnome-extensions info "$UUID" >/dev/null 2>&1; then
   # Known to the running shell, so this is an update: a disable/enable loads
   # the new ui-<n>.js and re-reads stylesheet.css.
   if [ "$reload_ui" -eq 1 ]; then
-    gnome-extensions disable "$UUID" 2>/dev/null || true
+    reload_extension || reload_extension || true
+  else
+    gnome-extensions enable "$UUID" || true
+    wait_state ACTIVE || true
   fi
-  gnome-extensions enable "$UUID" || true
-  if [ "$needs_login" -eq 1 ]; then
+  state=$(ext_state)
+  if [ "$state" != ACTIVE ]; then
+    echo "Done, but the panel indicator did not come back on (state: ${state:-unknown})."
+    echo "Run:  gnome-extensions enable $UUID"
+    echo "and if it still does not appear: journalctl --user -b | grep -i agent-usage"
+  elif [ "$needs_login" -eq 1 ]; then
     [ "$reload_ui" -eq 1 ] && echo "Done. The panel indicator has been reloaded with the new version,"
     [ "$reload_ui" -eq 1 ] || echo "Done."
     echo "but extension.js, metadata.json or the preferences page changed, and"
