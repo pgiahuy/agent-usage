@@ -26,7 +26,8 @@ Nothing needs configuring and there is no API key to paste: the collector
 reads the token each tool already wrote when you signed in. A tool that is not
 signed in shows token counts only, with no quota bars; one that is not
 installed is not shown at all. The Extensions app has the optional settings,
-under Agent Usage: how often quota is checked, and which tools to show. Signing in to Claude Code with an
+under Agent Usage: how often quota is checked, which tools to show, the popup
+layout (tiles, compact or large numbers) and the panel style (ring or text). Signing in to Claude Code with an
 API key rather than a subscription also gives no quota bars, because the quota
 endpoint measures a plan.
 

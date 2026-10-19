@@ -15,5 +15,24 @@
       <summary>Tools not shown</summary>
       <description>Ids of the tools to leave out: "claude", "kimi". A hidden tool disappears from the popup and the panel, and the collector stops reading its logs and asking its quota API.</description>
     </key>
+    <key name="popup-layout" type="s">
+      <choices>
+        <choice value="tiles"/>
+        <choice value="compact"/>
+        <choice value="numbers"/>
+      </choices>
+      <default>"tiles"</default>
+      <summary>Popup layout</summary>
+      <description>tiles: every limit is its own raised tile. compact: one thin row per limit. numbers: a large percentage per limit.</description>
+    </key>
+    <key name="pill-style" type="s">
+      <choices>
+        <choice value="ring"/>
+        <choice value="text"/>
+      </choices>
+      <default>"ring"</default>
+      <summary>Panel pill style</summary>
+      <description>ring: a gauge and the percentage per agent. text: the agent's initial and the percentage, no gauge.</description>
+    </key>
   </schema>
 </schemalist>

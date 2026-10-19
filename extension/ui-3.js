@@ -1,5 +1,9 @@
-/* The Agent Usage panel UI: every limit is its own raised tile, with the token
- * counts as two tiles side by side underneath.
+/* The Agent Usage panel UI: a pill in the top bar, and a popup drawn in one of
+ * three layouts the user picks in Preferences (popup-layout):
+ *   tiles    every limit is its own raised tile, token counts as two tiles
+ *   compact  one thin row per limit, token counts on one line
+ *   numbers  a large percentage per limit, two to a row
+ * The pill shows a ring per agent, or text only (pill-style).
  *
  * Loaded by extension.js, which always imports the highest-numbered ui-<n>.js.
  * Read the comment there before editing this file in place: an edit here only
@@ -35,6 +39,9 @@ const REFRESH_TRIGGER = GLib.build_filenamev([CACHE_DIR, 'refresh-request']);
 // width for the two to agree.
 const TRACK_W = 250;
 const MIN_FILL = 3;   // px, so that any usage at all stays visible
+// The compact row: 48px name + 8 + track + 8 + 34px number + 8 + reset time
+// fills the 272px card. Must match .agent-usage-ctrack.
+const COMPACT_TRACK_W = 104;
 const DUO_W = 133;    // (272 - 6px spacing) / 2
 const RING_SIZE = 20;
 // Refresh spinner: 20° every 33ms is a turn every 0.6s at about 30fps. Faster
@@ -63,18 +70,23 @@ class Pill extends St.BoxLayout {
 
     // Rebuild only when the shape changes; otherwise update in place so the
     // panel does not flicker on every 20-second refresh.
-    update(tools) {
+    update(tools, style) {
         if (this._slots.length !== tools.length) {
             this.destroy_all_children();
             this._slots = tools.map((_, i) => this._addSlot(i > 0));
         }
+        const rings = style !== 'text';
         tools.forEach((tool, i) => {
             const slot = this._slots[i];
-            if (tool.icon && slot.iconPath !== tool.icon) {
+            slot.icon.visible = rings && Boolean(tool.icon);
+            if (rings && tool.icon && slot.iconPath !== tool.icon) {
                 slot.iconPath = tool.icon;
                 slot.icon.gicon = Gio.FileIcon.new(Gio.File.new_for_path(tool.icon));
             }
-            slot.label.text = tool.badge ?? 'n/a';
+            const badge = tool.badge ?? 'n/a';
+            // Without the ring, the agent's initial says whose number it is for
+            // anyone who cannot tell the accent colours apart.
+            slot.label.text = rings || !tool.name ? badge : `${tool.name.charAt(0)} ${badge}`;
             slot.label.style = `color: ${tool.accent};`;
         });
     }
@@ -184,6 +196,90 @@ function fmtInt(n) {
     return (n ?? 0).toLocaleString('en-US');
 }
 
+// Token counts on one line, for the layouts that keep the popup short.
+function statLine(today, week) {
+    return new St.Label({
+        style_class: 'agent-usage-cstats',
+        text: `today ${today.tokens_h} \u00b7 ${fmtInt(today.reqs)} req      ` +
+              `7 days ${week.tokens_h} \u00b7 ${fmtInt(week.reqs)} req`,
+    });
+}
+
+function compactRow(limit) {
+    const used = consumed(limit);
+    const row = new St.BoxLayout({style_class: 'agent-usage-crow'});
+    row.add_child(new St.Label({style_class: 'agent-usage-cname', text: limit.label,
+                                y_align: Clutter.ActorAlign.CENTER}));
+    const track = new St.BoxLayout({style_class: 'agent-usage-ctrack',
+                                    y_align: Clutter.ActorAlign.CENTER});
+    let width = Math.round(used / 100 * COMPACT_TRACK_W);
+    if (used > 0 && width < MIN_FILL)
+        width = MIN_FILL;
+    track.add_child(new St.Widget({style_class: 'agent-usage-cfill',
+                                   style: `background-color: ${limit.colour}; width: ${width}px;`}));
+    row.add_child(track);
+    row.add_child(new St.Label({style_class: 'agent-usage-cpct', text: `${used}%`,
+                                style: `color: ${limit.colour};`,
+                                y_align: Clutter.ActorAlign.CENTER}));
+    row.add_child(new St.Label({style_class: 'agent-usage-when', text: limit.resets ?? '',
+                                x_expand: true, x_align: Clutter.ActorAlign.END,
+                                y_align: Clutter.ActorAlign.CENTER}));
+    return row;
+}
+
+function numberCell(limit) {
+    const used = consumed(limit);
+    const cell = tile('agent-usage-duo-tile');
+    const value = new St.BoxLayout({style_class: 'agent-usage-pct-box'});
+    value.add_child(new St.Label({style_class: 'agent-usage-big', text: String(used),
+                                  style: `color: ${limit.colour};`}));
+    value.add_child(new St.Label({style_class: 'agent-usage-big-unit', text: '%',
+                                  style: `color: ${limit.colour};`,
+                                  y_align: Clutter.ActorAlign.END}));
+    cell.add_child(value);
+    const note = limit.resets ? `${limit.label} \u00b7 ${limit.resets}` : limit.label;
+    cell.add_child(new St.Label({style_class: 'agent-usage-stat-k', text: note}));
+    return cell;
+}
+
+// Each layout fills one agent's block under its header. The stale note and the
+// no-quota case read the same in every layout.
+const LAYOUTS = {
+    tiles(block, tool) {
+        if (tool.limits.length) {
+            for (const limit of tool.limits)
+                block.add_child(limitTile(limit));
+        } else {
+            block.add_child(noQuotaTile(tool.why));
+        }
+        block.add_child(statTiles(tool.today, tool.week));
+    },
+
+    compact(block, tool) {
+        if (tool.limits.length) {
+            for (const limit of tool.limits)
+                block.add_child(compactRow(limit));
+        } else {
+            block.add_child(noteRow(`no quota: ${tool.why ?? 'local count only'}`));
+        }
+        block.add_child(statLine(tool.today, tool.week));
+    },
+
+    numbers(block, tool) {
+        if (tool.limits.length) {
+            for (let i = 0; i < tool.limits.length; i += 2) {
+                const row = new St.BoxLayout({style_class: 'agent-usage-duo agent-usage-num-row'});
+                for (const limit of tool.limits.slice(i, i + 2))
+                    row.add_child(numberCell(limit));
+                block.add_child(row);
+            }
+        } else {
+            block.add_child(noteRow(`no quota: ${tool.why ?? 'local count only'}`));
+        }
+        block.add_child(statLine(tool.today, tool.week));
+    },
+};
+
 // The design tracks the tool names out at .14em. St has no letter-spacing, so
 // the spacing goes into the string; these are fixed ASCII names, never user text.
 function spaced(name) {
@@ -209,7 +305,7 @@ class Indicator extends PanelMenu.Button {
         this.menu.addMenuItem(item);
 
         this._state = null;
-        this._hidden = new Set();
+        this._view = {hidden: new Set(), layout: 'tiles', pill: 'ring'};
         // The timers outlive the actors they touch unless something stops them.
         // The icon is a child, already disposed by the time this runs.
         this.connect('destroy', () => {
@@ -219,10 +315,11 @@ class Indicator extends PanelMenu.Button {
         this._render();
     }
 
-    // The collector also drops hidden tools, but only on its next 20-second
-    // pass; filtering here as well makes the switch take effect at once.
-    setHidden(hidden) {
-        this._hidden = hidden;
+    // What the user picked in Preferences. The collector also drops hidden
+    // tools, but only on its next 20-second pass; filtering here as well makes
+    // the switch take effect at once.
+    setView(view) {
+        this._view = view;
         this._render();
     }
 
@@ -273,10 +370,12 @@ class Indicator extends PanelMenu.Button {
     _render() {
         this._body.destroy_all_children();
         this._spinIcon = null;  // went with the children; _refreshButton makes a new one
-        const tools = (this._state?.tools ?? []).filter(t => !this._hidden.has(t.id));
+        const {hidden, layout, pill} = this._view;
+        const tools = (this._state?.tools ?? []).filter(t => !hidden.has(t.id));
+        const fill = LAYOUTS[layout] ?? LAYOUTS.tiles;
 
         if (!tools.length) {
-            this._pill.update([{accent: '#8b90a0', badge: 'n/a', icon: null}]);
+            this._pill.update([{accent: '#8b90a0', badge: 'n/a', icon: null}], pill);
             this._body.add_child(new St.Label({
                 style_class: 'agent-usage-note',
                 text: this._state
@@ -286,7 +385,7 @@ class Indicator extends PanelMenu.Button {
             return;
         }
 
-        this._pill.update(tools);
+        this._pill.update(tools, pill);
 
         tools.forEach((tool, index) => {
             const block = new St.BoxLayout({
@@ -310,16 +409,9 @@ class Indicator extends PanelMenu.Button {
             }
             block.add_child(head);
 
-            if (tool.limits.length) {
-                if (tool.stale)
-                    block.add_child(noteRow(`last known: ${tool.why ?? 'not reachable'}`));
-                for (const limit of tool.limits)
-                    block.add_child(limitTile(limit));
-            } else {
-                block.add_child(noQuotaTile(tool.why));
-            }
-
-            block.add_child(statTiles(tool.today, tool.week));
+            if (tool.stale)
+                block.add_child(noteRow(`last known: ${tool.why ?? 'not reachable'}`));
+            fill(block, tool);
             this._body.add_child(block);
         });
     }
@@ -359,9 +451,8 @@ export class AgentUsageUi {
 
         try {
             this._settings = this._extension.getSettings(SCHEMA_ID);
-            this._settingsId = this._settings.connect('changed::hidden-tools',
-                () => this._applyHidden());
-            this._applyHidden();
+            this._settingsId = this._settings.connect('changed', () => this._applyView());
+            this._applyView();
         } catch (e) {
             // No compiled schema: show every tool, as before settings existed.
             logError(e, 'agent-usage: settings unavailable');
@@ -402,8 +493,12 @@ export class AgentUsageUi {
         this._indicator = null;
     }
 
-    _applyHidden() {
-        this._indicator?.setHidden(new Set(this._settings.get_strv('hidden-tools')));
+    _applyView() {
+        this._indicator?.setView({
+            hidden: new Set(this._settings.get_strv('hidden-tools')),
+            layout: this._settings.get_string('popup-layout'),
+            pill: this._settings.get_string('pill-style'),
+        });
     }
 
     // The daemon writes atomically (temp file + rename), which emits several

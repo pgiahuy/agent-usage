@@ -5,10 +5,22 @@
  */
 
 import Adw from 'gi://Adw';
+import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 // tag, as the collector and the state file name it; and the label shown here.
 const TOOLS = [['claude', 'Claude Code'], ['kimi', 'Kimi Code']];
+
+// [value stored in the setting, label shown]
+const LAYOUTS = [
+    ['tiles', 'Tiles'],
+    ['compact', 'Compact'],
+    ['numbers', 'Large numbers'],
+];
+const PILL_STYLES = [
+    ['ring', 'Ring and percentage'],
+    ['text', 'Text only'],
+];
 
 export default class AgentUsagePreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
@@ -17,6 +29,7 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
 
         const page = new Adw.PreferencesPage();
         page.add(this._toolsGroup(settings));
+        page.add(this._appearanceGroup(settings));
 
         const group = new Adw.PreferencesGroup({
             title: 'Collector',
@@ -41,6 +54,32 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
         group.add(row);
         page.add(group);
         window.add(page);
+    }
+
+    _appearanceGroup(settings) {
+        const group = new Adw.PreferencesGroup({title: 'Appearance'});
+        group.add(this._choiceRow(settings, 'popup-layout', 'Popup layout', LAYOUTS));
+        group.add(this._choiceRow(settings, 'pill-style', 'Panel', PILL_STYLES));
+        return group;
+    }
+
+    _choiceRow(settings, key, title, choices) {
+        const row = new Adw.ComboRow({
+            title,
+            model: Gtk.StringList.new(choices.map(([, label]) => label)),
+        });
+        const sync = () => {
+            const i = choices.findIndex(([value]) => value === settings.get_string(key));
+            row.selected = Math.max(0, i);
+        };
+        row.connect('notify::selected', () => {
+            const value = choices[row.selected]?.[0];
+            if (value && value !== settings.get_string(key))
+                settings.set_string(key, value);
+        });
+        settings.connect(`changed::${key}`, sync);
+        sync();
+        return row;
     }
 
     _toolsGroup(settings) {
