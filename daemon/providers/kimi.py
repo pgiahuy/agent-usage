@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import urllib.error
 from datetime import datetime
@@ -315,6 +316,11 @@ def _kimi_running():
     return False
 
 
+# What a refresh replaces. Everything else in the file is kimi's to own.
+_TOKEN_FIELDS = ("access_token", "refresh_token", "expires_in", "expires_at",
+                 "scope", "token_type")
+
+
 def _write_private_json(path, obj):
     """Write obj to path atomically, and private to this user for certain.
 
@@ -348,6 +354,51 @@ def _write_private_json(path, obj):
     os.replace(tmp, path)
 
 
+# proper-lockfile abandons a lock untouched for 5s. Re-stamping every 2s keeps
+# a held lock held, which the request timeout alone cannot promise: it governs
+# connect and recv, not getaddrinfo, so one slow name lookup is enough to go
+# over. The library keeps its own locks alive the same way.
+_LOCK_STALE_S = 5.0
+_LOCK_REFRESH_S = 2.0
+
+
+class _LockKeeper:
+    """Keep a held lock's mtime fresh for as long as it is held."""
+
+    def __init__(self, path):
+        self.path = path
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def _run(self):
+        while not self._stop.wait(_LOCK_REFRESH_S):
+            try:
+                os.utime(self.path, None)
+            except OSError:
+                return  # taken from us, or gone: the caller checks before writing
+
+    def __exit__(self, *_exc):
+        self._stop.set()
+        self._thread.join(timeout=_LOCK_STALE_S)
+
+
+def _lock_identity(path):
+    """(dev, ino) of the lock we hold, or None when it is gone.
+
+    A lock that was stolen and recreated is a different directory at the same
+    path, so comparing identity is what tells our lock from its replacement.
+    """
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_dev, st.st_ino)
+
+
 def renew(timeout=4):
     """Refresh Kimi's token the way kimi itself does, under kimi's own lock.
 
@@ -368,53 +419,77 @@ def renew(timeout=4):
         return "kimi is refreshing"
     except OSError as exc:
         return net.why(exc)
-    # proper-lockfile treats a lock untouched for 5 s as stale and takes it
-    # over, so the request timeout keeps the whole hold well under that.
+    held = _lock_identity(REFRESH_LOCK)
     try:
-        try:
-            with open(CREDS) as fh:
-                creds = json.load(fh)
-        except (OSError, ValueError):
-            return "not signed in"
-        if token()[0]:
-            return None  # renewed meanwhile, by kimi
-        refresh = creds.get("refresh_token")
-        if not refresh:
-            return "no refresh token"
-        try:
-            data = net.post_form(OAUTH_HOST + "/api/oauth/token", {
-                "client_id": CLIENT_ID,
-                "grant_type": "refresh_token",
-                "refresh_token": refresh,
-            }, timeout)
-        except urllib.error.HTTPError as exc:
-            net.discard(exc)
-            return "refresh HTTP %d" % exc.code
-        except (urllib.error.URLError, ValueError, TimeoutError, OSError) as exc:
-            return net.why(exc)
-        access = data.get("access_token")
-        expires_in = data.get("expires_in")
-        if not access or not isinstance(expires_in, (int, float)):
-            return "bad refresh reply"
-        creds.update(
-            access_token=access,
-            refresh_token=data.get("refresh_token") or refresh,
-            expires_in=expires_in,
-            expires_at=int(time.time() + expires_in),
-        )
-        for key in ("scope", "token_type"):
-            if data.get(key):
-                creds[key] = data[key]
-        try:
-            _write_private_json(CREDS, creds)
-        except OSError as exc:
-            return net.why(exc)
-        return None
+        with _LockKeeper(REFRESH_LOCK):
+            return _renew_locked(held, timeout)
     finally:
-        try:
-            os.rmdir(REFRESH_LOCK)
-        except OSError:
-            pass
+        # Only ours. A lock that was taken from us belongs to whoever has it
+        # now, and removing it would hand the credentials to two writers.
+        if _lock_identity(REFRESH_LOCK) == held:
+            try:
+                os.rmdir(REFRESH_LOCK)
+            except OSError:
+                pass
+
+
+def _renew_locked(held, timeout):
+    """The refresh itself, with the lock held and kept alive by the caller."""
+    try:
+        with open(CREDS) as fh:
+            creds = json.load(fh)
+    except (OSError, ValueError):
+        return "not signed in"
+    if token()[0]:
+        return None  # renewed meanwhile, by kimi
+    refresh = creds.get("refresh_token")
+    if not refresh:
+        return "no refresh token"
+    try:
+        data = net.post_form(OAUTH_HOST + "/api/oauth/token", {
+            "client_id": CLIENT_ID,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+        }, timeout)
+    except urllib.error.HTTPError as exc:
+        net.discard(exc)
+        return "refresh HTTP %d" % exc.code
+    except (urllib.error.URLError, ValueError, TimeoutError, OSError) as exc:
+        return net.why(exc)
+    access = data.get("access_token")
+    expires_in = data.get("expires_in")
+    if not access or not isinstance(expires_in, (int, float)):
+        return "bad refresh reply"
+    creds.update(
+        access_token=access,
+        refresh_token=data.get("refresh_token") or refresh,
+        expires_in=expires_in,
+        expires_at=int(time.time() + expires_in),
+    )
+    for key in ("scope", "token_type"):
+        if data.get(key):
+            creds[key] = data[key]
+    if _lock_identity(REFRESH_LOCK) != held:
+        # The lock was taken from us while the request was out, so another
+        # refresh may already have written a newer pair. Ours is newer at
+        # the server, but writing it blind could undo theirs, and we no
+        # longer hold the right to write at all.
+        return "lost the refresh lock"
+    # Re-read under the lock: anything kimi wrote to the other fields while
+    # the request was out is kept, and only the token fields are replaced.
+    try:
+        with open(CREDS) as fh:
+            latest = json.load(fh)
+        if isinstance(latest, dict):
+            latest.update({k: creds[k] for k in _TOKEN_FIELDS if k in creds})
+            creds = latest
+    except (OSError, ValueError):
+        pass
+    try:
+        _write_private_json(CREDS, creds)
+    except OSError as exc:
+        return net.why(exc)
+    return None
 
 
 PROVIDER = Provider(

@@ -117,6 +117,66 @@ class RenewTest(unittest.TestCase):
             self.assertEqual(fh.read(), "")  # nothing went through the link
         self.assertEqual(self.creds()["access_token"], "NEW_AT")
 
+    def test_the_held_lock_is_kept_fresh(self):
+        """proper-lockfile abandons a lock untouched for 5s.
+
+        Nothing used to touch it after the mkdir, so a hold that ran long,
+        which one slow DNS lookup is enough to cause, let kimi take the lock
+        and refresh at the same time. Both would spend the same rotating
+        refresh token and one side would end up signed out.
+        """
+        seen = []
+
+        def slow(*a, **kw):
+            seen.append(os.stat(kimi.REFRESH_LOCK).st_mtime)
+            time.sleep(kimi._LOCK_REFRESH_S * 1.5)
+            seen.append(os.stat(kimi.REFRESH_LOCK).st_mtime)
+            return {"access_token": "NEW_AT", "refresh_token": "NEW_RT", "expires_in": 900}
+
+        real = kimi.net.post_form
+        kimi.net.post_form = slow
+        try:
+            self.assertIsNone(kimi.renew())
+        finally:
+            kimi.net.post_form = real
+        self.assertGreater(seen[1], seen[0])  # re-stamped while the request was out
+
+    def test_a_stolen_lock_stops_the_write(self):
+        """Writing after losing the lock would undo whoever holds it now."""
+        def steal(*a, **kw):
+            os.rmdir(kimi.REFRESH_LOCK)
+            os.mkdir(kimi.REFRESH_LOCK)  # same path, different directory
+            return {"access_token": "NEW_AT", "refresh_token": "NEW_RT", "expires_in": 900}
+
+        real = kimi.net.post_form
+        kimi.net.post_form = steal
+        try:
+            self.assertEqual(kimi.renew(), "lost the refresh lock")
+        finally:
+            kimi.net.post_form = real
+        self.assertEqual(self.creds()["access_token"], "OLD")  # left alone
+        self.assertTrue(os.path.isdir(kimi.REFRESH_LOCK))  # not ours to remove
+
+    def test_fields_kimi_wrote_during_the_request_survive(self):
+        """The whole dict used to be written back from the pre-request read."""
+        def meddle(*a, **kw):
+            with open(kimi.CREDS) as fh:
+                creds = json.load(fh)
+            creds["device_id"] = "written-by-kimi"
+            with open(kimi.CREDS, "w") as fh:
+                json.dump(creds, fh)
+            return {"access_token": "NEW_AT", "refresh_token": "NEW_RT", "expires_in": 900}
+
+        real = kimi.net.post_form
+        kimi.net.post_form = meddle
+        try:
+            self.assertIsNone(kimi.renew())
+        finally:
+            kimi.net.post_form = real
+        creds = self.creds()
+        self.assertEqual(creds["device_id"], "written-by-kimi")
+        self.assertEqual(creds["access_token"], "NEW_AT")
+
     def test_valid_token_sends_nothing(self):
         kimi.renew()
         FakeAuth.requests = []
