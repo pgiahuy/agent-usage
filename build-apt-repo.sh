@@ -21,7 +21,7 @@ set -euo pipefail
 umask 022
 
 SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-VERSION=${VERSION:-1.0.0}
+VERSION=${VERSION:-$(cat "$SRC/VERSION")}
 REPO="$SRC/docs/apt"
 DIST="$REPO/dists/stable"
 POOL="$REPO/pool/main"

@@ -11,12 +11,14 @@ set -euo pipefail
 # dpkg wants 0755 directories; mktemp -d makes 0700 and a lax umask makes 0775.
 umask 022
 
-VERSION=${VERSION:-1.0.0}
+SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# The VERSION file is the only place the release number is written down, so a
+# bump is one edit and the .deb, the APT repo and the tag cannot disagree.
+VERSION=${VERSION:-$(cat "$SRC/VERSION")}
 # Whoever builds the package owns it. Override with the real address before
 # handing the .deb to anyone: MAINTAINER="You <you@example.com>" ./build-deb.sh
 MAINTAINER=${MAINTAINER:-"agent-usage contributors <agent-usage@users.noreply.github.com>"}
 UUID=agent-usage@pgiahuy.github.io
-SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 STAGE=$(mktemp -d)
 chmod 755 "$STAGE"
 trap 'rm -rf "$STAGE"' EXIT
