@@ -1,0 +1,71 @@
+name: Bug report
+description: The numbers are wrong, the panel is missing, or something fails
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found a security problem instead? Do not file it here. Use
+        **Report a vulnerability** on the Security tab.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected to see instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: terminal
+    attributes:
+      label: What the terminal view says
+      description: |
+        `agent-usage` prints the same reading the panel draws, so it separates a
+        collector problem from a drawing one. Paste the output.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: journal
+    attributes:
+      label: Collector log
+      description: "Output of: `journalctl --user -u agent-usage -n 50 --no-pager`"
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The contents of VERSION, or the commit you are on.
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: GNOME Shell, distribution and Python
+      description: "From: `gnome-shell --version`, your distribution, `python3 -V`"
+      placeholder: GNOME Shell 50, Ubuntu 25.10, Python 3.13
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: agents
+    attributes:
+      label: Which agent the problem is about
+      options:
+        - label: Claude Code
+        - label: Kimi Code
+        - label: Both, or neither in particular

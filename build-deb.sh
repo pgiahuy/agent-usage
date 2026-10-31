@@ -45,6 +45,11 @@ install -m 644 "$SRC"/extension/schemas/*.gschema.xml "$EXT/schemas/"
 glib-compile-schemas "$EXT/schemas"
 install -m 644 "$SRC/systemd/agent-usage.service" "$STAGE/usr/lib/systemd/user/agent-usage.service"
 install -m 644 "$SRC/README.md"           "$STAGE/usr/share/doc/agent-usage/README.md"
+# The readme links to these, so they travel with it or the links dead-end.
+install -m 644 "$SRC/CONTRIBUTING.md" "$SRC/SECURITY.md" "$SRC/CODE_OF_CONDUCT.md" \
+                                          "$STAGE/usr/share/doc/agent-usage/"
+# Debian looks for the upstream changelog under this exact name.
+install -m 644 "$SRC/CHANGELOG.md"        "$STAGE/usr/share/doc/agent-usage/changelog.md"
 install -d "$STAGE/usr/share/doc/agent-usage/docs"
 install -m 644 "$SRC"/docs/*.md           "$STAGE/usr/share/doc/agent-usage/docs/"
 

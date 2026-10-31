@@ -1,0 +1,42 @@
+name: Support another agent
+description: Ask for a coding agent beyond Claude Code and Kimi Code
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An agent can be supported when its usage can be read for real. Both
+        halves below are what decide that, so please fill in what you know.
+        See `docs/hacking.md`, "Adding an agent".
+
+  - type: input
+    id: agent
+    attributes:
+      label: Which agent
+      placeholder: name, and where it is installed from
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Where it writes session logs
+      description: |
+        The path, the file format, and one line that carries a token count,
+        with anything private removed.
+      render: text
+
+  - type: textarea
+    id: quota
+    attributes:
+      label: How its plan usage can be read
+      description: |
+        A documented endpoint if there is one. Say so if there is none: the
+        token counts alone are still worth a block.
+      render: text
+
+  - type: textarea
+    id: token
+    attributes:
+      label: Where it keeps its access token
+      description: The path, and how long the token lives, if you know.

@@ -1,5 +1,9 @@
 # agent-usage
 
+[![CI](https://github.com/pgiahuy/agent-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/pgiahuy/agent-usage/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GNOME Shell 48+](https://img.shields.io/badge/GNOME%20Shell-48%2B-4a86cf.svg)](https://release.gnome.org/)
+
 Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
 spent, when it resets, and how many tokens went out today and over the week.
 
@@ -25,11 +29,13 @@ Bars turn amber at 75% consumed and red at 90%.
 Nothing needs configuring and there is no API key to paste: the collector
 reads the token each tool already wrote when you signed in. A tool that is not
 signed in shows token counts only, with no quota bars; one that is not
-installed is not shown at all. The Extensions app has the optional settings,
-under Agent Usage: how often quota is checked, which tools to show, the popup
-layout (tiles, compact or large numbers) and the panel style (ring or text). Signing in to Claude Code with an
-API key rather than a subscription also gives no quota bars, because the quota
+installed is not shown at all. Signing in to Claude Code with an API key
+rather than a subscription also gives no quota bars, because the quota
 endpoint measures a plan.
+
+The Extensions app has the optional settings, under Agent Usage: how often
+quota is checked, which tools to show, the popup layout (tiles, compact or
+large numbers) and the panel style (ring or text).
 
 The terminal view (`agent-usage`) works anywhere, GNOME or not.
 
@@ -125,10 +131,22 @@ clears itself. The last known reading stays on screen, marked as such.
 running", the token renews on its own the next time that session talks to
 Kimi.
 
-## Development
+## Contributing
 
-How the two pieces fit, the refresh and backoff rules, the tunable constants,
-and how to ship a UI change to a running shell: [docs/hacking.md](docs/hacking.md).
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
+has the checks to run and the house style;
+[docs/hacking.md](docs/hacking.md) has the module layout, the refresh and
+backoff rules, how to ship a UI change to a running shell, and how to add an
+agent. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).
+
+Found a security problem? Please report it privately, not in an issue:
+[SECURITY.md](SECURITY.md).
+
+## Changes
+
+[CHANGELOG.md](CHANGELOG.md), and the current release number is in
+[VERSION](VERSION).
 
 ## License
 

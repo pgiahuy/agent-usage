@@ -1,0 +1,21 @@
+# The project is Python, shell, JavaScript, XML and Markdown, and every one of
+# them is written with spaces here. Editors that read this file need no setup.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{js,json,xml,gschema.xml,yml,yaml,css}]
+indent_size = 2
+
+[*.md]
+# Markdown gives a line-break meaning to two trailing spaces.
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
