@@ -34,6 +34,37 @@ package, since there is no checkout to run it from:
 Removal is `sudo apt remove agent-usage`. That leaves each user's
 `~/.cache/agent-usage`, which is just cached readings and icons.
 
+## extensions.gnome.org
+
+The store is where most people look for a GNOME extension, and it takes a zip
+rather than a repository. The schema goes in as source, not compiled: the
+store compiles it, which is why `gschemas.compiled` is not in the tree and why
+the installer and `build-deb.sh` each compile their own.
+
+```sh
+cd extension
+gnome-extensions pack . \
+  --extra-source="$(basename "$(ls ui-*.js | sort -V | tail -1)")" \
+  --extra-source=prefs.js \
+  --schema=schemas/org.gnome.shell.extensions.agent-usage.gschema.xml
+```
+
+Two things to settle before submitting.
+
+The loader has to go. `extension.js` picks its entry point by listing the
+directory and importing the highest-numbered `ui-<n>.js`. Store review is a
+person reading the zip, and the rule is that the code they read is the code
+that runs, so anything shaped like finding a file and loading it is refused.
+Replacing it with a static `import` of a single `ui.js` is the fix, and it
+costs the no-logout upgrade in `install.sh`, which exists only because that
+numbering gives the shell a URI it has not cached yet. A store install
+upgrades at the next login either way, so the two routes want different
+things here.
+
+`shell-version` has to cover the shells you intend to support. The store shows
+an extension only to the versions listed, and the shell refuses to load it
+anywhere else.
+
 ## `apt install agent-usage`, from your own repository
 
 For plain `apt install agent-usage`, and `apt upgrade` picking up new versions
@@ -60,7 +91,9 @@ The script signs only with the key `AGENT_USAGE_GPG_KEY` names, never the
 first one in the keyring: the signing key's public half, with its name and
 email, is published in `docs/apt/agent-usage.asc`. Use a key made for this.
 
-Then each user adds the source once:
+Then each user adds the source once. The address below is an example built
+from this repository's own name: nothing is published there, and the commands
+only work once you have run the steps above against a repository of your own.
 
 ```sh
 sudo install -d /etc/apt/keyrings

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/pgiahuy/agent-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/pgiahuy/agent-usage/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![GNOME Shell 48+](https://img.shields.io/badge/GNOME%20Shell-48%2B-4a86cf.svg)](https://release.gnome.org/)
+[![GNOME Shell 48 to 50](https://img.shields.io/badge/GNOME%20Shell-48%20to%2050-4a86cf.svg)](https://release.gnome.org/)
 
 Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
 spent, when it resets, and how many tokens went out today and over the week.
@@ -21,7 +21,9 @@ Bars turn amber at 75% consumed and red at 90%.
 
 ## Requirements
 
-- GNOME Shell 48 or newer for the panel indicator (developed and tested on 50)
+- GNOME Shell 48, 49 or 50 for the panel indicator (developed on 50). The
+  shell refuses to load an extension outside the range `metadata.json`
+  declares, so a newer shell needs that list extended first.
 - Python 3.8+, standard library only
 - systemd user session (optional: without it, run the collector yourself)
 - Claude Code and/or Kimi Code signed in

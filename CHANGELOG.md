@@ -51,6 +51,48 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
 
 ### Fixed
 
+- A session log belongs to another program, so a line the extractor could not
+  read used to stop the collector writing its state file at all, and because
+  the byte offset was committed only after the sweep, the same line broke
+  every later pass too. The panel froze for as long as that line was in the
+  log.
+- A log file replaced in place at the same size or larger was resumed from the
+  middle, which lost every record in it for good. Offsets key on the inode now.
+- A cached reading could raise in four places and take the whole state file
+  down with it, including the other agent and the token counts that were fine.
+  The shape is checked where the file is read, and the daemon's guard is per
+  agent.
+- The 429 backoff never grew. It was derived from the time left on the
+  previous deadline, which is always zero by the time the code runs, so every
+  rejection produced the same 60s and the 900s ceiling was unreachable.
+- Kimi's credentials file was not reliably private: the mode on a create is
+  ignored when the file already exists, so residue from a crashed run kept its
+  own mode, and the open followed a symlink left at that path.
+- Kimi's refresh lock was never re-stamped, so a hold that ran long, which one
+  slow DNS lookup causes, let kimi take the lock and refresh at the same time
+  and sign the user out. The lock is kept alive while held, the write happens
+  only while we still own it, and the teardown no longer removes a lock that
+  has become someone else's.
+- A refresh rolled the credentials file back to the copy read before the
+  request, discarding anything kimi wrote meanwhile.
+- One Refresh could hold the collector's only thread for over two minutes, so
+  SIGTERM did not land and `systemctl stop` ended in a SIGKILL. The renew and
+  the endpoint sweep each work to one budget now, and a timed-out `claude` no
+  longer leaves its children behind.
+- Clearing the cache directory counted as pressing Refresh, which renews
+  tokens: a real Kimi rotation and a `claude` prompt nobody asked for.
+- The kimi-is-running check looked at argv[0] only, so a wrapped install was
+  reported as not running, dropping the first defence the refresh relies on.
+- `quota-interval` had no bounds in code, and dconf does not enforce the
+  schema range on a value written straight into it, so a 0 asked for a quota
+  call every 20 seconds.
+- The panel trusted the shape of its state file: a malformed one threw out of
+  the render, which killed the poll timer and left `disable()` logging a GLib
+  critical. Colours are checked before reaching an St style and an icon path
+  must be one the collector wrote.
+- Preferences leaked its settings handlers for the life of the process, and
+  the extension metadata had no url, which is the only place someone who
+  installed it on its own learns a collector is needed.
 - The tray fallback called a function that did not exist, so it raised on its
   first draw. The tray is since gone, but the same mistake would have reached
   the panel.
