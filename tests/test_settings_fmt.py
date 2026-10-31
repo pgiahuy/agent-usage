@@ -61,5 +61,31 @@ class FmtTest(unittest.TestCase):
         self.assertEqual(fmt.short_model("anthropic/claude-opus-5-5"), "opus-5-5")
 
 
+class QuotaIntervalTest(unittest.TestCase):
+    def setUp(self):
+        self.real = settings.get
+        self.addCleanup(lambda: setattr(settings, "get", self.real))
+
+    def answer(self, raw):
+        settings.get = lambda key: raw
+
+    def test_out_of_range_values_are_clamped(self):
+        """The schema says 2 to 60 minutes, but dconf does not enforce a range
+        on a value written straight into it, and a 0 asked for a quota call on
+        every pass against an endpoint that rate-limits hard."""
+        self.answer("uint32 0")
+        self.assertEqual(settings.quota_every(300), settings.MIN_QUOTA_S)
+        self.answer("uint32 100000")
+        self.assertEqual(settings.quota_every(300), settings.MAX_QUOTA_S)
+        self.answer("uint32 5")
+        self.assertEqual(settings.quota_every(300), 300)
+
+    def test_an_unreadable_value_keeps_the_default(self):
+        self.answer(None)
+        self.assertEqual(settings.quota_every(300), 300)
+        self.answer("nonsense")
+        self.assertEqual(settings.quota_every(300), 300)
+
+
 if __name__ == "__main__":
     unittest.main()

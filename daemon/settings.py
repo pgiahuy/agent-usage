@@ -33,18 +33,26 @@ def get(key):
                 capture_output=True, text=True, timeout=5, check=True,
             ).stdout.strip()
         except (OSError, subprocess.SubprocessError):
-            return None
-        return out or None
+            continue  # a stale install here must not mask a working one below
+        if out:
+            return out
     return None
+
+
+# The schema says 2 to 60 minutes. dconf does not enforce a range on a value
+# written directly into it, so the bounds are applied here as well: without
+# them a 0 asks for a quota call on every pass.
+MIN_QUOTA_S, MAX_QUOTA_S = 120, 3600
 
 
 def quota_every(default):
     """Seconds between quota checks. A uint32 prints as "uint32 5"."""
     raw = get("quota-interval")
     try:
-        return int(raw.split()[-1]) * 60
+        seconds = int(raw.split()[-1]) * 60
     except (AttributeError, ValueError, IndexError):
         return default
+    return max(MIN_QUOTA_S, min(MAX_QUOTA_S, seconds))
 
 
 def hidden_tools():

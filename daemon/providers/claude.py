@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
+import time
 from datetime import datetime
 
 import net
@@ -104,6 +106,45 @@ def _find_cli():
     return shutil.which("claude") or (fallback if os.access(fallback, os.X_OK) else None)
 
 
+# The whole renew shares one budget. It runs on the daemon's only thread, so
+# for as long as it lasts the per-second SIGTERM check does not run, and
+# systemctl stop waits out its timeout and then SIGKILLs. Two attempts at
+# their own generous timeouts used to add up to well over two minutes.
+_RENEW_BUDGET_S = 45.0
+
+
+def _run_briefly(argv, limit):
+    """Run argv, giving up after limit seconds. True when it exited by itself.
+
+    Its own session, so a timeout can signal the whole group: claude spawns
+    node children, and killing the direct child alone would leave them
+    running.
+    """
+    try:
+        proc = subprocess.Popen(
+            argv, cwd=paths.CACHE_DIR, stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return False
+    try:
+        proc.wait(timeout=limit)
+        return True
+    except subprocess.TimeoutExpired:
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(proc.pid, sig)
+            except OSError:
+                break
+            try:
+                proc.wait(timeout=2)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        return False
+
+
 def renew():
     """Have Claude Code renew its own token, so nothing here acts as Claude Code.
 
@@ -114,17 +155,17 @@ def renew():
     if cli is None:
         return "claude not found"
     paths.ensure_cache_dir()
+    deadline = time.monotonic() + _RENEW_BUDGET_S
     attempts = (
-        ([cli, "auth", "status"], 20),
-        ([cli, "-p", "ok", "--model", "haiku", "--tools", "", "--strict-mcp-config",
-          "--no-session-persistence"], 120),
+        [cli, "auth", "status"],
+        [cli, "-p", "ok", "--model", "haiku", "--tools", "", "--strict-mcp-config",
+         "--no-session-persistence"],
     )
-    for argv, limit in attempts:
-        try:
-            subprocess.run(argv, cwd=paths.CACHE_DIR, stdin=subprocess.DEVNULL,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                           timeout=limit, check=False)
-        except (OSError, subprocess.TimeoutExpired):
+    for argv in attempts:
+        left = deadline - time.monotonic()
+        if left <= 1:
+            return "renew timed out"
+        if not _run_briefly(argv, left):
             continue
         if token()[0]:
             return None

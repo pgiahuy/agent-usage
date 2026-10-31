@@ -239,6 +239,10 @@ def parse_limits(data):
 # --------------------------------------------------------------------------
 
 
+# How long a whole endpoint sweep may take, however many candidates are left.
+_PROBE_BUDGET_S = 20.0
+
+
 def _probe(tok, timeout):
     """Sweep the candidate paths for one that reports usage, as (path, payload, rows).
 
@@ -258,9 +262,16 @@ def _probe(tok, timeout):
         candidates = list(_PATHS)
 
     fallback = (None, None)
+    # One budget for the sweep, not one timeout per candidate: seven of those
+    # back to back would hold the daemon's only thread long enough to stall
+    # the SIGTERM check and the refresh trigger with it.
+    deadline = time.monotonic() + min(_PROBE_BUDGET_S, timeout * 2)
     for path in candidates:
+        left = deadline - time.monotonic()
+        if left <= 0.5:
+            break
         try:
-            data = net.get_json(API_BASE + path, tok, timeout)
+            data = net.get_json(API_BASE + path, tok, min(timeout, left))
         except urllib.error.HTTPError as exc:
             if exc.code in (401, 403, 429):
                 raise
@@ -303,15 +314,29 @@ def fetch(tok, timeout):
 
 
 def _kimi_running():
+    """True when any kimi process is up.
+
+    Every argument is checked, not just argv[0]: a native binary puts its own
+    path there, but a node or shell wrapped install puts the interpreter
+    there and kimi further along. Missing that would quietly drop the first of
+    the three things that keep a refresh from racing kimi's own. The resolved
+    executable is checked too, which catches a wrapper that renames itself.
+    """
     for pid in os.listdir("/proc"):
         if not pid.isdigit():
             continue
         try:
             with open("/proc/%s/cmdline" % pid, "rb") as fh:
-                argv0 = fh.read().split(b"\0", 1)[0]
+                argv = fh.read().split(b"\0")
         except OSError:
             continue
-        if os.path.basename(argv0) == b"kimi":
+        if any(os.path.basename(a) == b"kimi" for a in argv if a):
+            return True
+        try:
+            exe = os.readlink("/proc/%s/exe" % pid)
+        except OSError:
+            continue
+        if os.path.basename(exe) == "kimi" or exe.startswith(HOME + os.sep):
             return True
     return False
 

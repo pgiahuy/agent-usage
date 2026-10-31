@@ -167,11 +167,18 @@ def write_state(state):
     os.replace(tmp, STATE_PATH)
 
 
-def _trigger_mtime():
+def _trigger_stamp():
+    """The trigger file's mtime, or None when it is not there.
+
+    None rather than 0.0 so a deletion is not just another change of stamp.
+    A forced pass renews tokens, which for Kimi means rotating a real refresh
+    token and for Claude means running a prompt, so clearing the cache
+    directory must not be enough to ask for one.
+    """
     try:
         return os.path.getmtime(TRIGGER_PATH)
     except OSError:
-        return 0.0
+        return None
 
 
 def main():
@@ -181,7 +188,7 @@ def main():
     collector = Collector()
     readings = {}
     last_quota = 0.0
-    seen_trigger = _trigger_mtime()
+    seen_trigger = _trigger_stamp()
 
     while _running:
         forced = False
@@ -212,8 +219,8 @@ def main():
         for _ in range(LOCAL_EVERY):
             if not _running:
                 break
-            stamp = _trigger_mtime()
-            if stamp != seen_trigger:
+            stamp = _trigger_stamp()
+            if stamp is not None and (seen_trigger is None or stamp > seen_trigger):
                 seen_trigger = stamp
                 readings = fetch_quota(providers, FORCED_FRESH_S, renew=True)
                 last_quota = time.time()
