@@ -130,8 +130,16 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 if [ -r "$STATE" ]; then
   ok "state.json was written $(( $(date +%s) - $(stat -c %Y "$STATE") ))s ago"
+elif [ "$(systemctl --user is-active agent-usage 2>/dev/null)" = active ]; then
+  # The first pass reads the whole window rather than a tail, which on a large
+  # log takes the better part of a minute. Running right after an install, that
+  # is not a fault yet, so it is reported as waiting rather than broken.
+  info "no state.json yet, but the collector is running: the first pass reads"
+  info "every log in the window and can take a minute. Re-run this if the panel"
+  info "is still empty after that."
 else
-  bad "no $STATE, so the collector has written nothing. Read why in:"
+  bad "no $STATE and the collector is not running. Start it and read why in:"
+  bad "  systemctl --user start agent-usage"
   bad "  journalctl --user -u agent-usage -n 30"
 fi
 
