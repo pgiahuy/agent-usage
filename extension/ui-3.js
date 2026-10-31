@@ -59,6 +59,46 @@ const SCHEMA_ID = 'org.gnome.shell.extensions.agent-usage';
 
 const consumed = limit => Math.max(0, Math.min(100, limit.percent ?? 0));
 
+// A colour reaches an St inline style, so it is checked rather than trusted:
+// the daemon writes these, but the UI should not hand its style parser
+// whatever happens to be in a file on disk.
+const HEX = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const UNKNOWN = '#8b90a0';
+const colour = c => (typeof c === 'string' && HEX.test(c) ? c : UNKNOWN);
+
+// The shell renders whatever file this names, so only the directory the daemon
+// renders its ring icons into is accepted.
+const ICON_DIR = GLib.build_filenamev([CACHE_DIR, 'icons']) + '/';
+const iconPath = p =>
+    (typeof p === 'string' && p.startsWith(ICON_DIR) && !p.includes('/..') ? p : null);
+
+// One tool as the UI needs it, whatever the file actually held. Without this a
+// tools entry that is not an object, or a tool with no limits array, threw out
+// of _render and took the poll timer with it.
+function sane(tool) {
+    const t = (tool && typeof tool === 'object') ? tool : {};
+    const limits = Array.isArray(t.limits) ? t.limits.filter(l => l && typeof l === 'object') : [];
+    const totals = v => (v && typeof v === 'object') ? v : {tokens: 0, tokens_h: '0', reqs: 0};
+    return {
+        id: typeof t.id === 'string' ? t.id : '',
+        name: typeof t.name === 'string' ? t.name : '?',
+        accent: colour(t.accent),
+        badge: typeof t.badge === 'string' ? t.badge : 'n/a',
+        why: typeof t.why === 'string' ? t.why : null,
+        stale: Boolean(t.stale),
+        icon: iconPath(t.icon),
+        limits: limits.map(l => ({
+            label: typeof l.label === 'string' ? l.label : '?',
+            percent: Number.isFinite(l.percent) ? l.percent : 0,
+            resets: typeof l.resets === 'string' ? l.resets : '',
+            colour: colour(l.colour),
+        })),
+        today: totals(t.today),
+        week: totals(t.week),
+        models: Array.isArray(t.models) ? t.models : [],
+    };
+}
+
 /* ---------------------------------------------------------------- panel pill */
 
 const Pill = GObject.registerClass({GTypeName: `AgentUsagePill${REV}`},
@@ -280,8 +320,9 @@ const LAYOUTS = {
     },
 };
 
-// The design tracks the tool names out at .14em. St has no letter-spacing, so
-// the spacing goes into the string; these are fixed ASCII names, never user text.
+// The design tracks the tool names out at .14em, and St has no letter-spacing,
+// so the spacing goes into the string. The name comes from state.json, so it is
+// whatever sane() allowed through rather than a constant in this file.
 function spaced(name) {
     return name.split('').join(' ');
 }
@@ -371,7 +412,8 @@ class Indicator extends PanelMenu.Button {
         this._body.destroy_all_children();
         this._spinIcon = null;  // went with the children; _refreshButton makes a new one
         const {hidden, layout, pill} = this._view;
-        const tools = (this._state?.tools ?? []).filter(t => !hidden.has(t.id));
+        const raw = Array.isArray(this._state?.tools) ? this._state.tools : [];
+        const tools = raw.map(sane).filter(t => !hidden.has(t.id));
         const fill = LAYOUTS[layout] ?? LAYOUTS.tiles;
 
         if (!tools.length) {
@@ -519,10 +561,19 @@ export class AgentUsageUi {
             const [ok, bytes] = this._file.load_contents(null);
             if (ok)
                 state = JSON.parse(new TextDecoder().decode(bytes));
+            this._indicator?.setState(state);
         } catch (e) {
-            // Missing or half-written file is a normal transient state.
-            state = null;
+            // A missing or half-written file is a normal transient state. A
+            // throw from the render is not, and it must not escape into the
+            // GSource callback that called us: GJS drops a source whose
+            // callback throws, which would kill the poll and leave disable()
+            // removing an id that no longer exists.
+            try {
+                this._indicator?.setState(null);
+            } catch (inner) {
+                logError(inner, 'agent-usage: could not clear the panel');
+            }
+            logError(e, 'agent-usage: could not show the collector state');
         }
-        this._indicator?.setState(state);
     }
 }

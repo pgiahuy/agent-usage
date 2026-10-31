@@ -5,7 +5,7 @@
  */
 
 import Adw from 'gi://Adw';
-import Gtk from 'gi://Gtk';
+import Gtk from 'gi://Gtk?version=4.0';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 // tag, as the collector and the state file name it; and the label shown here.
@@ -27,9 +27,20 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
         const settings = this.getSettings();
         window._settings = settings;  // keep it alive as long as the window
 
+        // The settings object outlives this window, so a handler left on it
+        // keeps the row it updates alive, and through the row the window.
+        const handlers = [];
+        const bind = id => handlers.push(id);
+        window.connect('destroy', () => {
+            for (const id of handlers)
+                settings.disconnect(id);
+            handlers.length = 0;
+            window._settings = null;
+        });
+
         const page = new Adw.PreferencesPage();
-        page.add(this._toolsGroup(settings));
-        page.add(this._appearanceGroup(settings));
+        page.add(this._toolsGroup(settings, bind));
+        page.add(this._appearanceGroup(settings, bind));
 
         const group = new Adw.PreferencesGroup({
             title: 'Collector',
@@ -47,23 +58,23 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
             if (settings.get_uint('quota-interval') !== v)
                 settings.set_uint('quota-interval', v);
         });
-        settings.connect('changed::quota-interval', () => {
+        bind(settings.connect('changed::quota-interval', () => {
             row.value = settings.get_uint('quota-interval');
-        });
+        }));
 
         group.add(row);
         page.add(group);
         window.add(page);
     }
 
-    _appearanceGroup(settings) {
+    _appearanceGroup(settings, bind) {
         const group = new Adw.PreferencesGroup({title: 'Appearance'});
-        group.add(this._choiceRow(settings, 'popup-layout', 'Popup layout', LAYOUTS));
-        group.add(this._choiceRow(settings, 'pill-style', 'Panel', PILL_STYLES));
+        group.add(this._choiceRow(settings, bind, 'popup-layout', 'Popup layout', LAYOUTS));
+        group.add(this._choiceRow(settings, bind, 'pill-style', 'Panel', PILL_STYLES));
         return group;
     }
 
-    _choiceRow(settings, key, title, choices) {
+    _choiceRow(settings, bind, key, title, choices) {
         const row = new Adw.ComboRow({
             title,
             model: Gtk.StringList.new(choices.map(([, label]) => label)),
@@ -77,12 +88,12 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
             if (value && value !== settings.get_string(key))
                 settings.set_string(key, value);
         });
-        settings.connect(`changed::${key}`, sync);
+        bind(settings.connect(`changed::${key}`, sync));
         sync();
         return row;
     }
 
-    _toolsGroup(settings) {
+    _toolsGroup(settings, bind) {
         const group = new Adw.PreferencesGroup({
             title: 'Tools',
             description: 'A hidden tool leaves the panel and the popup, and the collector stops reading its logs and asking its quota API.',
@@ -113,7 +124,7 @@ export default class AgentUsagePreferences extends ExtensionPreferences {
                 row.sensitive = !(row.active && shown === 1);
             }
         };
-        settings.connect('changed::hidden-tools', sync);
+        bind(settings.connect('changed::hidden-tools', sync));
         sync();
         return group;
     }
