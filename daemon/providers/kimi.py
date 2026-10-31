@@ -316,12 +316,35 @@ def _kimi_running():
 
 
 def _write_private_json(path, obj):
+    """Write obj to path atomically, and private to this user for certain.
+
+    O_CREAT's mode argument applies only when open() creates the file, so
+    residue from an earlier crashed run at a laxer mode kept that mode and the
+    fresh refresh token landed in it. O_EXCL makes creation the only
+    possibility, which also means open() cannot be aimed through a symlink
+    someone left at the temp path. fchmod then states the mode outright
+    instead of leaving it to the umask.
+    """
     tmp = path + ".agent-usage.tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        json.dump(obj, fh)
-        fh.flush()
-        os.fsync(fh.fileno())
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            json.dump(obj, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+    except BaseException:
+        # Leaving the temp file behind would make the next run take the
+        # pre-existing path again, which is the hole this closes.
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     os.replace(tmp, path)
 
 

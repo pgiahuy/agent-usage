@@ -89,6 +89,34 @@ class RenewTest(unittest.TestCase):
         self.assertEqual(os.stat(kimi.CREDS).st_mode & 0o777, 0o600)
         self.assertFalse(os.path.exists(kimi.REFRESH_LOCK))
 
+    def test_mode_holds_even_with_residue_at_the_temp_path(self):
+        """O_CREAT's mode is ignored when the file already exists.
+
+        A crashed earlier run can leave the temp file behind, and it used to
+        keep whatever mode it had: the fresh refresh token then landed in a
+        world-readable file.
+        """
+        tmp = kimi.CREDS + ".agent-usage.tmp"
+        with open(tmp, "w") as fh:
+            fh.write("residue")
+        os.chmod(tmp, 0o666)
+        self.assertIsNone(kimi.renew())
+        self.assertEqual(os.stat(kimi.CREDS).st_mode & 0o777, 0o600)
+        self.assertEqual(self.creds()["access_token"], "NEW_AT")
+        self.assertFalse(os.path.exists(tmp))
+
+    def test_a_symlink_at_the_temp_path_is_not_followed(self):
+        """open() follows symlinks, so the token could be written through one."""
+        tmp = kimi.CREDS + ".agent-usage.tmp"
+        victim = os.path.join(os.path.dirname(kimi.CREDS), "victim")
+        with open(victim, "w"):
+            pass
+        os.symlink(victim, tmp)
+        self.assertIsNone(kimi.renew())
+        with open(victim) as fh:
+            self.assertEqual(fh.read(), "")  # nothing went through the link
+        self.assertEqual(self.creds()["access_token"], "NEW_AT")
+
     def test_valid_token_sends_nothing(self):
         kimi.renew()
         FakeAuth.requests = []
