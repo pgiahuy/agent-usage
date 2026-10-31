@@ -15,6 +15,25 @@ Notable changes per release. The format follows
   beside the integer it requires.
 - Contributing guide, security policy, code of conduct, this changelog, issue
   and pull request templates, and an `.editorconfig`.
+- `tools/doctor.sh`, a read-only check that says why the panel indicator is
+  not showing and gives the command for each thing it finds. It ships inside
+  the `.deb` too, at `/usr/share/agent-usage/doctor.sh`, since a package
+  install has no checkout to run it from.
+
+### Fixed
+
+- The installer compared the running GNOME Shell against a version written
+  into the script, and only complained when it was too old. A shell newer than
+  the extension declares was installed over in silence, and the shell then
+  refused to load the extension without saying why. The check now reads the
+  range out of `metadata.json`, so it cannot drift, and reports either side of
+  it.
+- The installer said nothing when `disable-user-extensions` was on. That one
+  switch stops every user extension loading, with nothing in any log to
+  explain the empty panel, which made a fresh machine look like a broken
+  install. It is now reported, with the command to turn extensions back on,
+  and deliberately not flipped: doing that would also switch back on every
+  other extension the user had turned off on purpose.
 
 ## [1.0.0] - 2026-08-13
 

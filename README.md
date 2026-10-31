@@ -117,9 +117,16 @@ KIMI_CODE_HOME=/data/kimi-code
 
 ## Troubleshooting
 
-**Nothing in the panel.** Log out once after the first install. Then
-`gnome-extensions info agent-usage@pgiahuy.github.io` should say ACTIVE, and
-`journalctl --user -u org.gnome.Shell@wayland -n 50` shows any load error.
+```sh
+./tools/doctor.sh      # read-only; says what is wrong and the command to fix it
+```
+
+**Nothing in the panel.** Run the line above first. Almost always one of
+three things: the session has not been restarted since the install, user
+extensions are switched off for the whole session
+(`gsettings get org.gnome.shell disable-user-extensions` returns true), or
+GNOME Shell is outside the versions `extension/metadata.json` declares, in
+which case the shell refuses to load the extension and reports nothing.
 
 **"agent-usage daemon is not running".** `systemctl --user status agent-usage`, and
 `journalctl --user -u agent-usage -n 50` for the reason.

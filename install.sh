@@ -55,13 +55,31 @@ echo "agent-usage: installing"
 say "python:    $PYTHON"
 
 # --- gnome shell version --------------------------------------------------
+# Read out of metadata.json rather than written again here, so the check and
+# what the shell actually enforces cannot drift apart. A shell outside the
+# declared range refuses to load the extension and says nothing about why,
+# and that is true above the range as well as below it.
+declared_shell_versions() {
+  tr -d '\n' < "$SRC/extension/metadata.json" \
+    | sed -n 's/.*"shell-version"[^[]*\[\([^]]*\)\].*/\1/p' | tr -d ' "'
+}
+
 if command -v gnome-shell >/dev/null 2>&1; then
   shell_version=$(gnome-shell --version 2>/dev/null | grep -o '[0-9][0-9]*' | head -1)
+  declared=$(declared_shell_versions)
   say "gnome shell: ${shell_version:-unknown}"
-  if [ -n "${shell_version:-}" ] && [ "$shell_version" -lt 48 ] 2>/dev/null; then
-    say "warning: the extension needs GNOME Shell 48 or newer (St.BoxLayout"
-    say "         gained the orientation property there). The collector and"
-    say "         the 'agent-usage' terminal view work on any version."
+  if [ -n "${shell_version:-}" ] && [ -n "$declared" ]; then
+    case ",$declared," in
+      *",$shell_version,"*) ;;
+      *)
+        say "warning: the extension declares GNOME Shell $declared and this"
+        say "         session is $shell_version, so the shell will refuse to"
+        say "         load it. The collector and the 'agent-usage' terminal"
+        say "         view work on any version. To try it anyway, add"
+        say "         \"$shell_version\" to shell-version in"
+        say "         extension/metadata.json and run this again."
+        ;;
+    esac
   fi
 else
   say "gnome shell: not found, installing the collector and CLI only"
@@ -199,6 +217,17 @@ reload_extension() {
   wait_state ACTIVE
 }
 
+# This one switch beats every per-extension setting: with it on, nothing
+# user-installed loads and the panel stays empty with nothing in any log to
+# say why. Reported rather than flipped, because turning it off would also
+# switch back on every other extension the user had turned off on purpose.
+if command -v gsettings >/dev/null 2>&1 \
+   && [ "$(gsettings get org.gnome.shell disable-user-extensions 2>/dev/null)" = true ]; then
+  say "warning: user extensions are switched off for this session, so none"
+  say "         will load. Turn them back on with:"
+  say "           gsettings set org.gnome.shell disable-user-extensions false"
+fi
+
 echo
 if command -v gnome-extensions >/dev/null 2>&1 && gnome-extensions info "$UUID" >/dev/null 2>&1; then
   # Known to the running shell, so this is an update: a disable/enable loads
@@ -232,5 +261,7 @@ else
   echo "Done, except for one step this script could not do:"
   echo
   echo "  log out and back in, then run:  gnome-extensions enable $UUID"
+  echo
+  echo "If the indicator still does not appear, ./tools/doctor.sh says why."
 fi
 echo "Check the numbers from a terminal any time with: agent-usage"

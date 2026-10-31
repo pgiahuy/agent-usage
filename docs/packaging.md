@@ -24,6 +24,13 @@ gnome-extensions enable agent-usage@pgiahuy.github.io   # once per user, after o
 Do not run `install.sh` as well, or you end up with two copies, one in
 `/usr` and one in `$HOME`, and the `$HOME` one wins on `PATH`.
 
+When the panel indicator does not appear, the diagnostic lands with the
+package, since there is no checkout to run it from:
+
+```sh
+/usr/share/agent-usage/doctor.sh
+```
+
 Removal is `sudo apt remove agent-usage`. That leaves each user's
 `~/.cache/agent-usage`, which is just cached readings and icons.
 

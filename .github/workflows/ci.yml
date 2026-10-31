@@ -37,7 +37,7 @@ jobs:
       - name: ruff
         run: pipx run ruff==0.17.0 check daemon tests
       - name: shellcheck
-        run: shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in
+        run: shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in
       - name: extension JavaScript parses
         run: for f in extension/*.js; do node --check "$f"; done
       - name: GSettings schema compiles

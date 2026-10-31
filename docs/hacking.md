@@ -152,7 +152,7 @@ After editing a Python file: `systemctl --user restart agent-usage`.
 ```sh
 python3 -m unittest discover -s tests          # every test, no network
 ruff check daemon tests                        # ruff.toml names the rules
-shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in
+shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in
 ```
 
 The tests point every path the collector touches (cache, `~/.claude`,

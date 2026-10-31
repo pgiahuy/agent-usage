@@ -8,7 +8,7 @@ Closes #
 
 - [ ] `python3 -m unittest discover -s tests`
 - [ ] `ruff check daemon tests`
-- [ ] `shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in`
+- [ ] `shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in`
 - [ ] `./install.sh` and looked at the real panel
 - [ ] Added or updated a test, if this touches the collector
 

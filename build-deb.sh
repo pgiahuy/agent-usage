@@ -44,6 +44,9 @@ install -m 644 "$SRC"/extension/schemas/*.gschema.xml "$EXT/schemas/"
 # the extension, so the compiled file is just another file the package owns.
 glib-compile-schemas "$EXT/schemas"
 install -m 644 "$SRC/systemd/agent-usage.service" "$STAGE/usr/lib/systemd/user/agent-usage.service"
+# A .deb install has no repository checkout, so the diagnostic the readme and
+# the installer both point at has to travel with the package.
+install -m 755 "$SRC/tools/doctor.sh" "$STAGE/usr/share/agent-usage/doctor.sh"
 install -m 644 "$SRC/README.md"           "$STAGE/usr/share/doc/agent-usage/README.md"
 # The readme links to these, so they travel with it or the links dead-end.
 install -m 644 "$SRC/CONTRIBUTING.md" "$SRC/SECURITY.md" "$SRC/CODE_OF_CONDUCT.md" \

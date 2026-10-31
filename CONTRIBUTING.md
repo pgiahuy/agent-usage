@@ -33,7 +33,7 @@ CI runs these, so run them before you push:
 ```sh
 python3 -m unittest discover -s tests
 ruff check daemon tests
-shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh bin/agent-usage.in
+shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in
 for f in extension/*.js; do node --check "$f"; done
 glib-compile-schemas --strict --dry-run extension/schemas
 ```
