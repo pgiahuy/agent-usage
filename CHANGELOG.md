@@ -57,7 +57,9 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
   every later pass too. The panel froze for as long as that line was in the
   log.
 - A log file replaced in place at the same size or larger was resumed from the
-  middle, which lost every record in it for good. Offsets key on the inode now.
+  middle, which lost every record in it for good. Offsets key on the inode
+  and on the file's first bytes, since a replacement can be handed the inode
+  the old file just released.
 - A cached reading could raise in four places and take the whole state file
   down with it, including the other agent and the token counts that were fine.
   The shape is checked where the file is read, and the daemon's guard is per

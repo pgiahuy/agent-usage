@@ -17,6 +17,10 @@ from datetime import date, timedelta
 # Only the last 7 days are ever reported; the extra day absorbs timezone skew.
 WINDOW_DAYS = 8
 
+# How much of a file's start is remembered to tell it from a replacement that
+# was given the same inode. One line of either log is well under this.
+_HEAD_BYTES = 512
+
 FIELDS = ("inp", "out", "cache_read", "cache_write")
 
 
@@ -64,26 +68,28 @@ class Scanner:
             if st.st_mtime < cutoff:
                 continue
             ident = (st.st_dev, st.st_ino)
-            prev_ident, off = self.offsets.get(path, (None, 0))
-            # Size alone cannot tell a resumed append from a file replaced in
-            # place: a rewrite to the same size or larger would be resumed from
-            # the middle, leaving the offset misaligned for good. The inode
-            # answers it outright, and the newline check below catches a
-            # rewrite that reused the inode.
+            prev_ident, prev_head, off = self.offsets.get(path, (None, None, 0))
+            # Size cannot tell an append from a file replaced in place: a
+            # rewrite to the same size or larger would be resumed from the
+            # middle and stay misaligned for good. The inode usually settles
+            # it, but a replacement can be handed the inode the old file just
+            # released, so the first bytes are remembered too. They do not
+            # change on an append and almost never survive a rewrite.
             if prev_ident != ident or st.st_size < off:
                 off = 0
             if st.st_size == off:
                 continue
             try:
-                self._read(path, ident, off, cutoff)
+                self._read(path, ident, prev_head, off, cutoff)
             except OSError:
                 continue
         self._prune(cutoff)
         return self.days
 
-    def _read(self, path, ident, off, cutoff):
+    def _read(self, path, ident, prev_head, off, cutoff):
         with open(path, "rb") as fh:
-            if off and not self._resumes_cleanly(fh, off):
+            head = fh.read(_HEAD_BYTES)
+            if off and (head != prev_head or not self._resumes_cleanly(fh, off)):
                 off = 0
             fh.seek(off)
             pos = off
@@ -114,15 +120,11 @@ class Scanner:
                     bucket.add(key)
                 _add(self.days.setdefault(day, {}).setdefault(model, zero()),
                      inp, out, cread, cwrite)
-            self.offsets[path] = (ident, pos)
+            self.offsets[path] = (ident, head, pos)
 
     @staticmethod
     def _resumes_cleanly(fh, off):
-        """True when byte off-1 is a newline, so off really is a line boundary.
-
-        Catches a rewrite that landed on the same inode, which the identity
-        check above cannot see.
-        """
+        """True when byte off-1 is a newline, so off really is a line boundary."""
         try:
             fh.seek(off - 1)
             return fh.read(1) == b"\n"

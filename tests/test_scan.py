@@ -104,20 +104,34 @@ class ScannerTest(unittest.TestCase):
         self.append(claude_line("m2", "r2"))
         self.assertEqual(self.today()["reqs"], 2)
 
-    def test_a_file_replaced_in_place_is_read_from_the_start(self):
+    def test_a_replaced_file_is_read_from_the_start(self):
         """Size cannot tell an append from a replacement.
 
         A rewrite to the same size or larger used to resume from the stored
         offset, so the first bytes read were half a line and every record in
-        the new file was lost for good.
+        the new file was lost for good. Covered twice, because the two ways a
+        file gets replaced leave different evidence: a fresh inode, and the
+        inode handed straight back to the replacement, where only the changed
+        first bytes give it away. A rewrite that lands on a line boundary
+        defeats everything else.
         """
         self.append(claude_line("m1", "r1") + claude_line("m2", "r2"))
         self.assertEqual(self.today()["reqs"], 2)
+
         os.remove(self.path)
-        with open(self.path, "w") as fh:  # new inode, bigger than the old offset
+        with open(self.path, "w") as fh:
             fh.write(claude_line("m3", "r3") + claude_line("m4", "r4")
                      + claude_line("m5", "r5"))
         self.assertEqual(self.today()["reqs"], 5)
+        reused = os.stat(self.path).st_ino
+
+        # In place: same inode for certain, longer, and still line-aligned.
+        with open(self.path, "r+") as fh:
+            fh.write(claude_line("m6", "r6") + claude_line("m7", "r7")
+                     + claude_line("m8", "r8") + claude_line("m9", "r9"))
+            fh.truncate()
+        self.assertEqual(os.stat(self.path).st_ino, reused)
+        self.assertEqual(self.today()["reqs"], 9)
 
 
 if __name__ == "__main__":
