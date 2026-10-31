@@ -141,38 +141,55 @@ class RenewTest(unittest.TestCase):
             kimi.net.post_form = real
         self.assertGreater(seen[1], seen[0])  # re-stamped while the request was out
 
-    def test_a_stolen_lock_stops_the_write(self):
-        """Writing after losing the lock would undo whoever holds it now."""
-        def steal(*a, **kw):
-            os.rmdir(kimi.REFRESH_LOCK)
-            os.mkdir(kimi.REFRESH_LOCK)  # same path, different directory
+    def _during_request(self, meddle):
+        """Run renew with meddle() happening while the token request is out."""
+        real = kimi.net.post_form
+
+        def post(*a, **kw):
+            meddle()
             return {"access_token": "NEW_AT", "refresh_token": "NEW_RT", "expires_in": 900}
 
-        real = kimi.net.post_form
-        kimi.net.post_form = steal
+        kimi.net.post_form = post
         try:
-            self.assertEqual(kimi.renew(), "lost the refresh lock")
+            return kimi.renew()
         finally:
             kimi.net.post_form = real
+
+    def test_a_lock_that_vanished_stops_the_write(self):
+        """Writing without the lock is writing against whoever takes it next."""
+        self.assertEqual(
+            self._during_request(lambda: os.rmdir(kimi.REFRESH_LOCK)),
+            "lost the refresh lock",
+        )
         self.assertEqual(self.creds()["access_token"], "OLD")  # left alone
+
+    def test_a_replaced_lock_is_neither_written_under_nor_removed(self):
+        """A lock taken from us is a different directory at the same path.
+
+        The replacement is made before the original goes, so the two cannot
+        share an inode: creating a directory straight after removing one can
+        reuse it, and that made this test depend on the filesystem.
+        """
+        def steal():
+            other = kimi.REFRESH_LOCK + ".other"
+            os.mkdir(other)                  # distinct: the original still exists
+            os.rmdir(kimi.REFRESH_LOCK)
+            os.rename(other, kimi.REFRESH_LOCK)
+
+        self.assertEqual(self._during_request(steal), "lost the refresh lock")
+        self.assertEqual(self.creds()["access_token"], "OLD")
         self.assertTrue(os.path.isdir(kimi.REFRESH_LOCK))  # not ours to remove
 
     def test_fields_kimi_wrote_during_the_request_survive(self):
         """The whole dict used to be written back from the pre-request read."""
-        def meddle(*a, **kw):
+        def meddle():
             with open(kimi.CREDS) as fh:
                 creds = json.load(fh)
             creds["device_id"] = "written-by-kimi"
             with open(kimi.CREDS, "w") as fh:
                 json.dump(creds, fh)
-            return {"access_token": "NEW_AT", "refresh_token": "NEW_RT", "expires_in": 900}
 
-        real = kimi.net.post_form
-        kimi.net.post_form = meddle
-        try:
-            self.assertIsNone(kimi.renew())
-        finally:
-            kimi.net.post_form = real
+        self.assertIsNone(self._during_request(meddle))
         creds = self.creds()
         self.assertEqual(creds["device_id"], "written-by-kimi")
         self.assertEqual(creds["access_token"], "NEW_AT")
