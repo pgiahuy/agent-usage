@@ -41,11 +41,26 @@ def read(name):
 
 
 def read_versioned(name):
-    """Cached reading, or None if it was written by a different build."""
+    """Cached reading, or None when it cannot be trusted.
+
+    The version check alone is not enough: it says which build wrote the file,
+    not that the file still holds what that build wrote. Everything read back
+    is fed to arithmetic and to date parsing, so the shape is checked here,
+    once, rather than guarded again at each use.
+    """
     data = read(name)
-    if isinstance(data, dict) and data.get("v") == VERSION:
-        return data
-    return None
+    if not isinstance(data, dict) or data.get("v") != VERSION:
+        return None
+    if not isinstance(data.get("fetched_at"), (int, float)) or isinstance(
+        data.get("fetched_at"), bool
+    ):
+        return None
+    limits = data.get("limits")
+    if limits is not None and (
+        not isinstance(limits, list) or not all(isinstance(x, dict) for x in limits)
+    ):
+        return None
+    return data
 
 
 def backoff_until(name):

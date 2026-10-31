@@ -63,27 +63,41 @@ class Scanner:
             # An mtime older than the window means every record inside is older too.
             if st.st_mtime < cutoff:
                 continue
-            off = self.offsets.get(path, 0)
-            if st.st_size < off:  # truncated or rewritten -> start over
+            ident = (st.st_dev, st.st_ino)
+            prev_ident, off = self.offsets.get(path, (None, 0))
+            # Size alone cannot tell a resumed append from a file replaced in
+            # place: a rewrite to the same size or larger would be resumed from
+            # the middle, leaving the offset misaligned for good. The inode
+            # answers it outright, and the newline check below catches a
+            # rewrite that reused the inode.
+            if prev_ident != ident or st.st_size < off:
                 off = 0
             if st.st_size == off:
                 continue
             try:
-                self._read(path, off, cutoff)
+                self._read(path, ident, off, cutoff)
             except OSError:
                 continue
         self._prune(cutoff)
         return self.days
 
-    def _read(self, path, off, cutoff):
+    def _read(self, path, ident, off, cutoff):
         with open(path, "rb") as fh:
+            if off and not self._resumes_cleanly(fh, off):
+                off = 0
             fh.seek(off)
             pos = off
             for raw in fh:
                 if not raw.endswith(b"\n"):
                     break  # half-written line; pick it up next sweep
                 pos += len(raw)
-                rec = self.extract(raw)
+                try:
+                    rec = self.extract(raw)
+                except Exception:
+                    # A log is someone else's file and may hold anything. pos is
+                    # already past this line, so skipping it here drops one
+                    # record instead of freezing every later sweep on it.
+                    continue
                 if rec is None:
                     continue
                 epoch, model, key, inp, out, cread, cwrite = rec
@@ -100,7 +114,20 @@ class Scanner:
                     bucket.add(key)
                 _add(self.days.setdefault(day, {}).setdefault(model, zero()),
                      inp, out, cread, cwrite)
-            self.offsets[path] = pos
+            self.offsets[path] = (ident, pos)
+
+    @staticmethod
+    def _resumes_cleanly(fh, off):
+        """True when byte off-1 is a newline, so off really is a line boundary.
+
+        Catches a rewrite that landed on the same inode, which the identity
+        check above cannot see.
+        """
+        try:
+            fh.seek(off - 1)
+            return fh.read(1) == b"\n"
+        except OSError:
+            return False
 
     def _prune(self, cutoff):
         keep = date.fromtimestamp(cutoff).isoformat()

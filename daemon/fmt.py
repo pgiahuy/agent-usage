@@ -27,7 +27,7 @@ def short_model(name):
 
 def fmt_reset(iso):
     """ISO UTC -> local 'HH:MM' today, 'Fri 09:00' within the week, else 'Aug 18, 16:00'."""
-    if not iso:
+    if not isinstance(iso, str) or not iso:
         return ""
     try:
         dt = datetime.fromisoformat(iso).astimezone()

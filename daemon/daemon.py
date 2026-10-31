@@ -89,11 +89,14 @@ def tool_state(provider, side, reading):
     raw_limits, live, why = quota.live_limits(reading)
     limits = [
         {
-            "label": lim["label"],
-            "percent": lim["percent"] or 0,
-            "severity": lim["severity"],
-            "colour": ring.severity_color(lim["percent"], lim["severity"]),
-            "resets": fmt.fmt_reset(lim["resets_at"]),
+            # .get, not indexing: a cached limit may have been written by an
+            # older build or come back short, and one missing field must not
+            # cost the tool its whole block.
+            "label": str(lim.get("label") or "?"),
+            "percent": lim.get("percent") or 0,
+            "severity": str(lim.get("severity") or "normal"),
+            "colour": ring.severity_color(lim.get("percent"), lim.get("severity") or "normal"),
+            "resets": fmt.fmt_reset(lim.get("resets_at")),
         }
         for lim in raw_limits
     ]
@@ -130,11 +133,29 @@ def tool_state(provider, side, reading):
 _STARTING = {"ok": False, "why": "starting"}
 
 
+def _safe_tool_state(provider, side, reading):
+    """tool_state, or a tool with no bars when its reading cannot be read.
+
+    A reading comes off disk and may have been written by a different build, or
+    corrupted. Letting that escape would cost every tool its update, and the
+    file is only rewritten on a later success, so the panel would stay frozen
+    on the stale copy.
+    """
+    try:
+        return tool_state(provider, side, reading)
+    except Exception as exc:
+        sys.stderr.write("agent-usage: %s reading unusable: %r\n" % (provider.tag, exc))
+        return tool_state(provider, side, {"ok": False, "why": "reading unusable"})
+
+
 def build_state(collector, readings, providers):
     local = collector.local(providers)
     return {
         "at": time.time(),
-        "tools": [tool_state(p, local[p.tag], readings.get(p.tag, _STARTING)) for p in providers],
+        "tools": [
+            _safe_tool_state(p, local[p.tag], readings.get(p.tag, _STARTING))
+            for p in providers
+        ],
     }
 
 

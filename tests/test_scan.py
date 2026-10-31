@@ -83,6 +83,42 @@ class ScannerTest(unittest.TestCase):
         summary = scan.summarize(self.scanner.scan())
         self.assertEqual(summary["week"]["total"]["reqs"], 0)
 
+    def test_a_line_the_extractor_cannot_read_is_skipped_for_good(self):
+        """A log belongs to another program and may hold anything.
+
+        Each of these raises out of claude.extract: a JSON array, a numeric
+        timestamp, a token count that is not a number. Before the guard the
+        exception left the sweep, which both stopped state.json being written
+        and left the offset uncommitted, so the same line broke every later
+        pass as well.
+        """
+        self.append(claude_line("m1", "r1"))
+        self.assertEqual(self.today()["reqs"], 1)
+        for bad in ('["usage", 1]\n',
+                    '{"type":"assistant","timestamp":1,"message":{"id":"x","usage":{}}}\n',
+                    '{"type":"assistant","timestamp":"2026-10-01T00:00:00Z",'
+                    '"message":{"id":"y","usage":{"input_tokens":"lots"}}}\n'):
+            self.append(bad)
+            self.assertEqual(self.today()["reqs"], 1)  # survived, nothing counted
+        # Later good records still arrive, which is what the offset proves.
+        self.append(claude_line("m2", "r2"))
+        self.assertEqual(self.today()["reqs"], 2)
+
+    def test_a_file_replaced_in_place_is_read_from_the_start(self):
+        """Size cannot tell an append from a replacement.
+
+        A rewrite to the same size or larger used to resume from the stored
+        offset, so the first bytes read were half a line and every record in
+        the new file was lost for good.
+        """
+        self.append(claude_line("m1", "r1") + claude_line("m2", "r2"))
+        self.assertEqual(self.today()["reqs"], 2)
+        os.remove(self.path)
+        with open(self.path, "w") as fh:  # new inode, bigger than the old offset
+            fh.write(claude_line("m3", "r3") + claude_line("m4", "r4")
+                     + claude_line("m5", "r5"))
+        self.assertEqual(self.today()["reqs"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

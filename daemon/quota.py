@@ -94,7 +94,7 @@ def reset_passed(iso, now=None):
 
     A stamp with no timezone is read as local, the same way fmt_reset reads it.
     """
-    if not iso:
+    if not isinstance(iso, str) or not iso:
         return False
     try:
         dt = datetime.fromisoformat(iso)
@@ -117,5 +117,9 @@ def live_limits(reading):
     if reading.get("ok"):
         return reading.get("limits") or [], True, None
     cached = (reading.get("cached") or {}).get("limits") or []
-    kept = [lim for lim in cached if not reset_passed(lim.get("resets_at"))]
+    kept = [
+        lim
+        for lim in cached
+        if isinstance(lim, dict) and not reset_passed(lim.get("resets_at"))
+    ]
     return kept, False, reading.get("why")

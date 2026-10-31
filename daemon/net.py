@@ -24,6 +24,28 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 OPENER = urllib.request.build_opener(_NoRedirect)
 
+# Replies are a few kilobytes. The cap is what keeps a wrong or hostile answer
+# from being read into memory without limit.
+MAX_BODY = 1 << 20
+
+
+def _reject(value):
+    raise ValueError("not JSON: %s" % value)
+
+
+def _read_json(resp):
+    """Decode a reply, refusing NaN and Infinity and anything oversized.
+
+    json.loads accepts bare NaN and Infinity by default. Neither is JSON, and
+    neither survives the trip: a NaN percent raises in the icon renderer, and
+    json.dump would write the bare token into state.json, where the
+    extension's JSON.parse rejects the file and the panel goes blank.
+    """
+    body = resp.read(MAX_BODY + 1)
+    if len(body) > MAX_BODY:
+        raise ValueError("reply larger than %d bytes" % MAX_BODY)
+    return json.loads(body.decode("utf-8"), parse_constant=_reject)
+
 
 def get_json(url, token, timeout, extra_headers=None):
     headers = {
@@ -35,7 +57,7 @@ def get_json(url, token, timeout, extra_headers=None):
         headers.update(extra_headers)
     req = urllib.request.Request(url, headers=headers)
     with OPENER.open(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return _read_json(resp)
 
 
 def post_form(url, fields, timeout):
@@ -50,7 +72,7 @@ def post_form(url, fields, timeout):
         },
     )
     with OPENER.open(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return _read_json(resp)
 
 
 def discard(exc):
