@@ -65,6 +65,33 @@ class FetchTest(unittest.TestCase):
         self.assertIn("rate limited", quota.fetch(self.fake.provider, fresh_for=0)["why"])
         self.assertEqual(self.fake.calls, ["fetch"])  # the second call never went out
 
+    def test_each_rejection_doubles_the_wait(self):
+        """The wait used to collapse back to the minimum every time.
+
+        It was derived from the time left on the previous deadline, but fetch
+        returns early for as long as that deadline stands, so the bump only
+        ran once it had passed, when the time left was zero. The result was a
+        constant 60s against an endpoint that rate-limits hard, and the
+        900s ceiling was unreachable.
+        """
+        self.fake.outcome = urllib.error.HTTPError("u", 429, "Too Many", {}, None)
+        name = "%s-backoff.json" % self.fake.provider.tag
+        waits = []
+        for _ in range(5):
+            quota.fetch(self.fake.provider, fresh_for=0)
+            state = cache.read(name)
+            waits.append(round(state["wait"]))
+            # Let the window lapse, which is the only state fetch will ask again in.
+            cache.write(name, dict(state, until=time.time() - 1))
+        self.assertEqual(waits, [60, 120, 240, 480, 900])
+
+        # A success wipes it, so the next rejection starts from the minimum.
+        self.fake.outcome = {"limits": []}
+        quota.fetch(self.fake.provider, fresh_for=0)
+        self.fake.outcome = urllib.error.HTTPError("u", 429, "Too Many", {}, None)
+        quota.fetch(self.fake.provider, fresh_for=0)
+        self.assertEqual(round(cache.read(name)["wait"]), 60)
+
     def test_unavailable_reports_its_reason(self):
         self.fake.outcome = quota.Unavailable("no usage endpoint")
         reading = quota.fetch(self.fake.provider, fresh_for=0)

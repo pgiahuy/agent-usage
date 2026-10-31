@@ -19,6 +19,9 @@ VERSION = 5
 FRESH_S = 120
 
 _BACKOFF_MIN, _BACKOFF_MAX = 60.0, 900.0
+# A rejection this long after the previous one is treated as unrelated, so the
+# wait starts from the minimum again instead of from where yesterday left off.
+_BACKOFF_FORGET = 3600.0
 
 
 def write(name, obj):
@@ -68,13 +71,29 @@ def backoff_until(name):
 
 
 def backoff_bump(name):
-    """Double the wait after each rejection, within bounds."""
-    prev = max(0.0, backoff_until(name) - time.time())
+    """Double the wait after each rejection, within bounds.
+
+    The wait is remembered next to the deadline rather than derived from the
+    time left on it. Deriving it could not work: the caller returns early for
+    as long as the deadline stands, so this is only ever reached once the
+    deadline has passed, when the time left is zero and every doubling
+    collapsed back to the minimum.
+
+    A rejection long after the last one starts over, so an endpoint that was
+    unhappy yesterday does not begin today at a quarter of an hour.
+    """
+    state = read(name) or {}
+    prev = state.get("wait")
+    if not isinstance(prev, (int, float)) or isinstance(prev, bool) or prev <= 0:
+        prev = 0.0
+    last = state.get("until", 0)
+    if not isinstance(last, (int, float)) or time.time() - last > _BACKOFF_FORGET:
+        prev = 0.0
     wait = min(_BACKOFF_MAX, max(_BACKOFF_MIN, prev * 2))
-    write(name, {"until": time.time() + wait})
+    write(name, {"until": time.time() + wait, "wait": wait})
     return wait
 
 
 def backoff_clear(name):
     if backoff_until(name):
-        write(name, {"until": 0})
+        write(name, {"until": 0, "wait": 0})
