@@ -42,7 +42,6 @@ const MIN_FILL = 3;   // px, so that any usage at all stays visible
 // The compact row: 48px name + 8 + track + 8 + 34px number + 8 + reset time
 // fills the 272px card. Must match .agent-usage-ctrack.
 const COMPACT_TRACK_W = 104;
-const DUO_W = 133;    // (272 - 6px spacing) / 2
 const RING_SIZE = 20;
 // Refresh spinner: 20° every 33ms is a turn every 0.6s at about 30fps. Faster
 // than that on a 14px glyph stops reading as rotation and just looks like
@@ -123,7 +122,7 @@ class Pill extends St.BoxLayout {
                 slot.iconPath = tool.icon;
                 slot.icon.gicon = Gio.FileIcon.new(Gio.File.new_for_path(tool.icon));
             }
-            const badge = tool.badge ?? 'n/a';
+            const badge = tool.badge;
             // Without the ring, the agent's initial says whose number it is for
             // anyone who cannot tell the accent colours apart.
             slot.label.text = rings || !tool.name ? badge : `${tool.name.charAt(0)} ${badge}`;
@@ -261,7 +260,7 @@ function compactRow(limit) {
     row.add_child(new St.Label({style_class: 'agent-usage-cpct', text: `${used}%`,
                                 style: `color: ${limit.colour};`,
                                 y_align: Clutter.ActorAlign.CENTER}));
-    row.add_child(new St.Label({style_class: 'agent-usage-when', text: limit.resets ?? '',
+    row.add_child(new St.Label({style_class: 'agent-usage-when', text: limit.resets,
                                 x_expand: true, x_align: Clutter.ActorAlign.END,
                                 y_align: Clutter.ActorAlign.CENTER}));
     return row;

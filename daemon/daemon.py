@@ -130,9 +130,6 @@ def tool_state(provider, side, reading):
     }
 
 
-_STARTING = {"ok": False, "why": "starting"}
-
-
 def _safe_tool_state(provider, side, reading):
     """tool_state, or a tool with no bars when its reading cannot be read.
 
@@ -153,7 +150,7 @@ def build_state(collector, readings, providers):
     return {
         "at": time.time(),
         "tools": [
-            _safe_tool_state(p, local[p.tag], readings.get(p.tag, _STARTING))
+            _safe_tool_state(p, local[p.tag], readings[p.tag])
             for p in providers
         ],
     }

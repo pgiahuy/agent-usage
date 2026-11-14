@@ -83,7 +83,7 @@ def ring_svg(percent, colour, known=True, accent=None):
     )
 
 
-def write_icon(cache_dir, percent, severity="normal", known=True, tag="x", accent=None):
+def write_icon(cache_dir, percent, severity="normal", *, known, tag, accent=None):
     """Render the gauge and return its path, or None if it could not be written.
 
     The path encodes the state because consumers cache icons by filename: the
@@ -116,13 +116,3 @@ def _sweep(icon_dir, keep, limit=8):
                 os.unlink(stale)
             except OSError:
                 pass
-
-
-if __name__ == "__main__":  # visual check: python3 ring.py out.svg 92
-    import sys
-
-    dest = sys.argv[1] if len(sys.argv) > 1 else "/tmp/ring.svg"
-    pct = float(sys.argv[2]) if len(sys.argv) > 2 else 92
-    with open(dest, "w") as fh:
-        fh.write(ring_svg(pct, severity_color(pct)))
-    print(dest)
