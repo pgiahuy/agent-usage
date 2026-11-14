@@ -112,8 +112,9 @@ compile the schema into the extension's own `schemas/` directory.
 
 The collector reads the same keys, so there is one store and nothing to keep
 in sync. It is standard library only, so it shells out to
-`gsettings --schemadir <extension>/schemas get` once per 20s pass
-(`settings.py`), and falls back to the built-in default when that fails.
+`gsettings --schemadir <extension>/schemas get` once per key, so twice on
+every 20s pass (`settings.py`), and falls back to the built-in default when
+that fails.
 
 | Key | Used by | Default |
 | --- | --- | --- |

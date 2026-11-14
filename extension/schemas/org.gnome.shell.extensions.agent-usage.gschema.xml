@@ -3,7 +3,7 @@
   <schema id="org.gnome.shell.extensions.agent-usage"
           path="/org/gnome/shell/extensions/agent-usage/">
     <!-- The collector reads this key too, with the gsettings command, so a
-         rename here has to be matched in daemon/daemon.py. -->
+         rename here has to be matched in daemon/settings.py. -->
     <key name="quota-interval" type="u">
       <range min="2" max="60"/>
       <default>5</default>
