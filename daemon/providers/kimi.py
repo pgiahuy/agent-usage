@@ -90,13 +90,17 @@ def token():
 # Reading the usage reply
 # --------------------------------------------------------------------------
 
-_PCT_KEYS = ("percent", "percentage", "utilization", "utilisation",
-             "usage_percent", "used_percent", "usedPercent")
-_USED_KEYS = ("used", "usage", "consumed", "current", "spent")
-_CAP_KEYS = ("limit", "total", "quota", "max", "cap", "allowance")
-_RESET_KEYS = ("resets_at", "resetAt", "reset_at", "reset_time", "resetTime",
-               "refresh_at", "next_reset", "nextReset", "period_end", "periodEnd")
-_NAME_KEYS = ("label", "name", "kind", "type", "window", "period", "scope", "id")
+# The endpoint is undocumented, so these are the key names its reply actually
+# used on 2026-08-13 and still used on 2026-11-15, plus at most one obvious
+# counterpart each. They are deliberately not a list of everything a usage API
+# might plausibly call a field: an invented synonym is never exercised, cannot
+# be tested, and reads as a guess to whoever comes next. Add a name
+# here when a reply is seen carrying it, and say so.
+_PCT_KEYS = ("percent", "percentage")
+_USED_KEYS = ("used",)
+_CAP_KEYS = ("limit", "total")
+_RESET_KEYS = ("resetTime", "reset_time", "resets_at")
+_NAME_KEYS = ("label", "name")
 _TIME_UNIT_MIN = {"minute": 1, "hour": 60, "day": 1440, "week": 10080}
 
 
@@ -125,7 +129,7 @@ def _pct_used(node):
     limit = _num(node, _CAP_KEYS)
     used = _num(node, _USED_KEYS)
     if used is None:
-        rest = _num(node, ("remaining", "left", "available"))
+        rest = _num(node, ("remaining",))
         if rest is not None and limit:
             used = limit - rest
     if used is None or not limit:
@@ -135,8 +139,8 @@ def _pct_used(node):
 
 def _window_label(window):
     """{'duration': 300, 'timeUnit': 'TIME_UNIT_MINUTE'} -> '5-hour'."""
-    n = _num(window, ("duration", "length", "size"))
-    unit = str(window.get("timeUnit") or window.get("unit") or "")
+    n = _num(window, ("duration",))
+    unit = str(window.get("timeUnit") or "")
     mins = _TIME_UNIT_MIN.get(unit.replace("TIME_UNIT_", "").lower())
     if n is None or not mins:
         return "Window"
@@ -220,7 +224,7 @@ def parse_limits(data):
     if rows:
         return rows
 
-    for key in ("usages", "quotas", "windows", "data", "result"):
+    for key in ("usages", "data"):
         inner = data.get(key)
         if isinstance(inner, list):
             rows = [r for r in (_as_limit(x) for x in inner) if r]
