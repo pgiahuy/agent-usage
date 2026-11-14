@@ -25,14 +25,30 @@ def short_model(name):
     return name
 
 
+def parse_iso(iso):
+    """An ISO stamp as a datetime, or None when it is not one.
+
+    A trailing Z becomes +00:00 first: fromisoformat only accepts Z from
+    Python 3.11 and the collector supports 3.8. Providers differ on which they
+    send, and one of them used to defend against this while the other did not,
+    so the normalising lives here, where every stamp passes through.
+    """
+    if not isinstance(iso, str) or not iso:
+        return None
+    if iso.endswith("Z"):
+        iso = iso[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+
+
 def fmt_reset(iso):
     """ISO UTC -> local 'HH:MM' today, 'Fri 09:00' within the week, else 'Aug 18, 16:00'."""
-    if not isinstance(iso, str) or not iso:
+    dt = parse_iso(iso)
+    if dt is None:
         return ""
-    try:
-        dt = datetime.fromisoformat(iso).astimezone()
-    except ValueError:
-        return ""
+    dt = dt.astimezone()
     days = (dt.date() - date.today()).days
     if days == 0:
         return dt.strftime("%H:%M")

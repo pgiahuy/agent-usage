@@ -15,6 +15,7 @@ import urllib.error
 from datetime import datetime
 
 import cache
+import fmt
 import net
 import paths
 import quota
@@ -152,9 +153,8 @@ def _window_label(window):
 def _to_iso(v):
     """Reset stamps arrive as ISO, epoch seconds or epoch milliseconds."""
     if isinstance(v, str):
-        # Kimi ends its stamps with Z, which fromisoformat only accepts from
-        # Python 3.11; normalising here keeps fmt_reset working on any of them.
-        return v[:-1] + "+00:00" if v.endswith("Z") else v
+        dt = fmt.parse_iso(v)
+        return dt.isoformat() if dt else v
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         secs = v / 1000.0 if v > 1e11 else float(v)
         try:

@@ -3,8 +3,10 @@ import _env  # noqa: F401  (must come first)
 import dataclasses
 import os
 import unittest
+from datetime import datetime
 
 import fmt
+import quota
 import settings
 from providers import PROVIDERS
 
@@ -59,6 +61,55 @@ class FmtTest(unittest.TestCase):
 
     def test_short_model(self):
         self.assertEqual(fmt.short_model("anthropic/claude-opus-5-5"), "opus-5-5")
+
+
+class ResetStampTest(unittest.TestCase):
+    """A reset stamp ending in Z has to parse on every Python we support.
+
+    datetime.fromisoformat only learned to read a trailing Z in 3.11, and the
+    collector supports 3.8. Kimi sends Z; Anthropic currently sends +00:00 but
+    is not promised to keep doing so. If a stamp fails to parse, fmt_reset
+    shows nothing and reset_passed answers False for ever, so a window that has
+    rolled over keeps its old percentage on screen as though it were current.
+
+    The stub below makes the older behaviour the test's own, so this fails on
+    any version if the normalising is removed, not only on 3.8 to 3.10.
+    """
+
+    class _Strict:
+        """datetime as it behaves before 3.11: a trailing Z is a ValueError."""
+
+        @staticmethod
+        def fromisoformat(text):
+            if text.endswith("Z"):
+                raise ValueError("Invalid isoformat string: %r" % text)
+            return datetime.fromisoformat(text)
+
+    def setUp(self):
+        self.saved = fmt.datetime
+        fmt.datetime = self._Strict
+
+    def tearDown(self):
+        fmt.datetime = self.saved
+
+    def test_a_stamp_ending_in_z_is_read(self):
+        dt = fmt.parse_iso("2026-11-21T13:45:53.362774Z")
+        self.assertIsNotNone(dt)
+        self.assertEqual(dt.utcoffset().total_seconds(), 0)
+        self.assertEqual(dt.year, 2026)
+
+    def test_a_stamp_ending_in_z_counts_as_passed_once_it_is_over(self):
+        self.assertTrue(quota.reset_passed("2020-01-01T00:00:00Z"))
+        self.assertFalse(quota.reset_passed("2099-01-01T00:00:00Z"))
+
+    def test_an_offset_stamp_still_works(self):
+        self.assertTrue(quota.reset_passed("2020-01-01T00:00:00+00:00"))
+        self.assertIsNotNone(fmt.parse_iso("2020-01-01T00:00:00+00:00"))
+
+    def test_what_is_not_a_stamp_is_not_one(self):
+        for junk in (None, "", "junk", 17, "Z"):
+            self.assertIsNone(fmt.parse_iso(junk))
+            self.assertFalse(quota.reset_passed(junk))
 
 
 class QuotaIntervalTest(unittest.TestCase):

@@ -11,9 +11,9 @@ from __future__ import annotations
 import json
 import time
 import urllib.error
-from datetime import datetime
 
 import cache
+import fmt
 import net
 
 
@@ -94,11 +94,8 @@ def reset_passed(iso, now=None):
 
     A stamp with no timezone is read as local, the same way fmt_reset reads it.
     """
-    if not isinstance(iso, str) or not iso:
-        return False
-    try:
-        dt = datetime.fromisoformat(iso)
-    except ValueError:
+    dt = fmt.parse_iso(iso)
+    if dt is None:
         return False
     if dt.tzinfo is None:
         dt = dt.astimezone()
