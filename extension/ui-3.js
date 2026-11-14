@@ -347,13 +347,17 @@ class Indicator extends PanelMenu.Button {
 
         this._state = null;
         this._view = {hidden: new Set(), layout: 'tiles', pill: 'ring'};
-        // The timers outlive the actors they touch unless something stops them.
-        // The icon is a child, already disposed by the time this runs.
-        this.connect('destroy', () => {
-            this._spinIcon = null;
-            this._stopSpin();
-        });
         this._render();
+    }
+
+    // The spin timer outlives the actor it touches unless something stops it.
+    // disable() calls destroy() on this instance, so the cleanup belongs in an
+    // override rather than on the 'destroy' signal: it then runs before the
+    // actor and its children are disposed, not during.
+    destroy() {
+        this._spinIcon = null;
+        this._stopSpin();
+        super.destroy();
     }
 
     // What the user picked in Preferences. The collector also drops hidden
