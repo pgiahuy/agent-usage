@@ -100,6 +100,11 @@ def tool_state(provider, side, reading):
         }
         for lim in raw_limits
     ]
+    # When the figures on screen were fetched: the new reading's stamp if they
+    # are live, the cached one's if they are what is left of it. Not this
+    # file's own time, which moves every pass whether or not anything was asked.
+    source = reading if live else (reading.get("cached") or {})
+    checked = source.get("fetched_at") if limits else None
     session = next((lim for lim in limits if lim["label"].startswith("5-hour")), None)
     icon = ring.write_icon(
         paths.CACHE_DIR,
@@ -124,6 +129,7 @@ def tool_state(provider, side, reading):
         ),
         "badge_is_percent": session is not None,
         "stale": not live and bool(limits),
+        "checked": checked,
         "today": _totals(side, "today"),
         "week": _totals(side, "week"),
         "models": _models(side),

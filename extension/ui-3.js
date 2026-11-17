@@ -105,6 +105,21 @@ const iconPath = p =>
 // One tool as the UI needs it, whatever the file actually held. Without this a
 // tools entry that is not an object, or a tool with no limits array, threw out
 // of _render and took the poll timer with it.
+// How long ago the figures were fetched, worked out when drawn. The popup is
+// redrawn on every write of state.json and on the 60s poll even when nothing
+// was written, so the age keeps moving when the collector has stopped, which
+// is when it matters most.
+function ago(stamp) {
+    const s = Math.max(0, Date.now() / 1000 - stamp);
+    if (s < 60)
+        return 'just now';
+    if (s < 3600)
+        return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400)
+        return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+}
+
 function sane(tool) {
     const t = (tool && typeof tool === 'object') ? tool : {};
     const limits = Array.isArray(t.limits) ? t.limits.filter(l => l && typeof l === 'object') : [];
@@ -116,6 +131,7 @@ function sane(tool) {
         badge: typeof t.badge === 'string' ? t.badge : 'n/a',
         why: typeof t.why === 'string' ? t.why : null,
         stale: Boolean(t.stale),
+        checked: Number.isFinite(t.checked) ? t.checked : null,
         icon: iconPath(t.icon),
         limits: limits.map(l => ({
             label: typeof l.label === 'string' ? l.label : '?',
@@ -496,6 +512,13 @@ class Indicator extends PanelMenu.Button {
                                          text: spaced(tool.name),
                                          style: `color: ${tool.accent};`,
                                          y_align: Clutter.ActorAlign.CENTER}));
+            // The figures are fetched every few minutes, not every time this is
+            // drawn, so they say how old they are.
+            if (tool.checked !== null) {
+                head.add_child(new St.Label({style_class: 'agent-usage-when',
+                                             text: `checked ${ago(tool.checked)}`,
+                                             y_align: Clutter.ActorAlign.CENTER}));
+            }
             // The refresh control rides in the first header row, right-aligned,
             // which is where the design puts it without costing a whole row.
             if (index === 0) {
