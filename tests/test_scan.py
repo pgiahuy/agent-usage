@@ -83,6 +83,23 @@ class ScannerTest(unittest.TestCase):
         summary = scan.summarize(self.scanner.scan())
         self.assertEqual(summary["week"]["total"]["reqs"], 0)
 
+    def test_a_claude_record_with_no_ids_still_counts_once(self):
+        # The same bytes twice, as a resumed session replays them.
+        line = claude_line(None, None)
+        self.append(line + line)
+        self.assertEqual(self.today()["reqs"], 1)
+        # A different record with no ids is a different reply.
+        self.append(claude_line(None, None, out=21))
+        self.assertEqual(self.today()["reqs"], 2)
+
+    def test_kimi_turns_differing_only_in_cache_writes_both_count(self):
+        scanner = scan.Scanner(os.path.join(self.dir, "*.jsonl"), kimi.extract)
+        ms = int(time.time() * 1000)
+        self.append(kimi_line(ms=ms, cwrite=0) + kimi_line(ms=ms, cwrite=900))
+        total = scan.summarize(scanner.scan())["today"]["total"]
+        self.assertEqual(total["reqs"], 2)
+        self.assertEqual(total["cache_write"], 900)
+
     def test_a_line_the_extractor_cannot_read_is_skipped_for_good(self):
         """A log belongs to another program and may hold anything.
 
