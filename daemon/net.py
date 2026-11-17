@@ -95,8 +95,28 @@ def why(exc):
             return "no network"
         if isinstance(reason, TimeoutError):
             return "timed out"
+        if isinstance(reason, OSError):
+            return _os_reason(reason)
         if reason is not None:
             return str(reason)
     if isinstance(exc, TimeoutError):
         return "timed out"
+    if isinstance(exc, socket.gaierror):
+        return "no network"
+    # After the branches above: URLError, TimeoutError and gaierror are all
+    # OSError subclasses, and each has a better answer than this one.
+    if isinstance(exc, OSError):
+        return _os_reason(exc)
     return str(exc)
+
+
+def _os_reason(exc):
+    """What went wrong, without where.
+
+    str() of an OSError about a file ends with the file's full path, which is
+    under the home directory more often than not, and would put it on screen.
+    strerror is the reason alone.
+    """
+    if exc.strerror:
+        return exc.strerror[:1].lower() + exc.strerror[1:]
+    return type(exc).__name__
