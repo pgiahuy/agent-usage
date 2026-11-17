@@ -65,6 +65,37 @@ const HEX = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const UNKNOWN = '#8b90a0';
 const colour = c => (typeof c === 'string' && HEX.test(c) ? c : UNKNOWN);
 
+// The light popup is white, and the colours that arrive inline (accents and
+// severity) were picked against the dark one: amber on white is 1.7:1. Each is
+// darkened, keeping its hue, until it reaches 4.5:1, the usual minimum for text
+// this size. Darkening rather than a second palette, because the accents come
+// from whichever providers are installed, not from a list this file knows.
+function luminance(hex) {
+    const ch = i => {
+        const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * ch(1) + 0.7152 * ch(3) + 0.0722 * ch(5);
+}
+
+const toHex = rgb => `#${rgb.map(v => v.toString(16).padStart(2, '0')).join('')}`;
+
+function onWhite(hex) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex))
+        return hex;
+    let rgb = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    // Black is 21:1 on white, so this always ends.
+    while (1.05 / (luminance(toHex(rgb)) + 0.05) < 4.5)
+        rgb = rgb.map(v => Math.floor(v * 0.92));
+    return toHex(rgb);
+}
+
+const forLight = tool => ({
+    ...tool,
+    accent: onWhite(tool.accent),
+    limits: tool.limits.map(l => ({...l, colour: onWhite(l.colour)})),
+});
+
 // The shell renders whatever file this names, so only the directory the daemon
 // renders its ring icons into is accepted.
 const ICON_DIR = GLib.build_filenamev([CACHE_DIR, 'icons']) + '/';
@@ -346,6 +377,7 @@ class Indicator extends PanelMenu.Button {
 
         this._state = null;
         this._view = {hidden: new Set(), layout: 'tiles', pill: 'ring'};
+        this._light = false;
         this._render();
     }
 
@@ -364,6 +396,20 @@ class Indicator extends PanelMenu.Button {
     // the switch take effect at once.
     setView(view) {
         this._view = view;
+        this._render();
+    }
+
+    // Whether the shell is showing its light style. The card takes a class the
+    // stylesheet keys its light colours on, and _render darkens the colours that
+    // come inline from state.json, which no stylesheet can reach.
+    setLight(light) {
+        if (light === this._light)
+            return;
+        this._light = light;
+        if (light)
+            this._body.add_style_class_name('agent-usage-light');
+        else
+            this._body.remove_style_class_name('agent-usage-light');
         this._render();
     }
 
@@ -430,9 +476,13 @@ class Indicator extends PanelMenu.Button {
             return;
         }
 
+        // Only what the popup draws is darkened. The pill sits on the top bar,
+        // which Ubuntu keeps dark in both styles; upstream GNOME lights it too,
+        // and the pill is not adjusted for that yet.
         this._pill.update(tools, pill);
+        const shown = this._light ? tools.map(forLight) : tools;
 
-        tools.forEach((tool, index) => {
+        shown.forEach((tool, index) => {
             const block = new St.BoxLayout({
                 style_class: index ? 'agent-usage-tool agent-usage-tool-next' : 'agent-usage-tool',
                 orientation: Clutter.Orientation.VERTICAL,
@@ -494,6 +544,13 @@ export class AgentUsageUi {
         this._indicator = new Indicator();
         Main.panel.addToStatusArea(this._uuid, this._indicator);
 
+        // A colour-scheme change restyles the shell by setting a new theme, and
+        // that is the event followed: it fires whichever setting caused it, and
+        // getStyleVariant() already has its new answer by then.
+        this._themeContext = St.ThemeContext.get_for_stage(global.stage);
+        this._themeId = this._themeContext.connect('changed', () => this._applyScheme());
+        this._applyScheme();
+
         try {
             this._settings = this._extension.getSettings(SCHEMA_ID);
             this._settingsId = this._settings.connect('changed', () => this._applyView());
@@ -516,6 +573,10 @@ export class AgentUsageUi {
     }
 
     disable() {
+        if (this._themeContext) {
+            this._themeContext.disconnect(this._themeId);
+            this._themeContext = null;
+        }
         if (this._settings) {
             this._settings.disconnect(this._settingsId);
             this._settings = null;
@@ -536,6 +597,10 @@ export class AgentUsageUi {
         this._file = null;
         this._indicator?.destroy();
         this._indicator = null;
+    }
+
+    _applyScheme() {
+        this._indicator?.setLight(Main.getStyleVariant() === 'light');
     }
 
     _applyView() {

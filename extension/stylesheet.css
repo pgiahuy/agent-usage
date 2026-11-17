@@ -278,3 +278,75 @@
   font-weight: 600;
   padding-bottom: 4px;
 }
+
+/* Light scheme ------------------------------------------------------------- */
+
+/* The popup only. ui-<n>.js puts agent-usage-light on the card when the
+   shell's style variant is light. Every rule here restates a colour and
+   nothing else, so the dark look cannot be changed by anything below. The
+   colours that arrive inline from state.json, the accents and the severity,
+   are darkened in ui-<n>.js instead, since a stylesheet cannot override an
+   inline style.
+
+   The pill's rules above are left as they are. Ubuntu keeps the top bar dark
+   in both styles, so there they are right either way; upstream GNOME lights
+   the top bar as well, and the pill does not account for that yet. */
+
+.agent-usage-light .agent-usage-tool-next {
+  border-top: 1px solid rgba(0, 0, 0, 0.09);
+}
+
+.agent-usage-light .agent-usage-refresh {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.agent-usage-light .agent-usage-refresh:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  color: #1f2329;
+}
+
+.agent-usage-light .agent-usage-refresh:focus {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.agent-usage-light .agent-usage-tile {
+  background-color: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.agent-usage-light .agent-usage-row-name {
+  color: #3a3f4b;
+}
+
+.agent-usage-light .agent-usage-when {
+  color: #646a78;
+}
+
+.agent-usage-light .agent-usage-track {
+  background-color: rgba(0, 0, 0, 0.09);
+}
+
+.agent-usage-light .agent-usage-stat-k {
+  color: #5f6573;
+}
+
+.agent-usage-light .agent-usage-stat-v {
+  color: #1f2329;
+}
+
+.agent-usage-light .agent-usage-note {
+  color: #5f6573;
+}
+
+.agent-usage-light .agent-usage-cname {
+  color: #3a3f4b;
+}
+
+.agent-usage-light .agent-usage-ctrack {
+  background-color: rgba(0, 0, 0, 0.09);
+}
+
+.agent-usage-light .agent-usage-cstats {
+  color: #5f6573;
+}
