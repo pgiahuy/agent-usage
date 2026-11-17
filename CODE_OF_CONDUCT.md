@@ -9,8 +9,8 @@ Be decent to each other. Discuss the code, not the person writing it.
 - Keep criticism about the change: what it does, what it breaks, what it costs.
 - Assume the other person is trying to help, including when they are wrong.
 - Accept that a maintainer may turn a change down and still be glad you sent
-  it. A narrow tool stays useful by saying no more often than yes.
-- Remember that most people here are writing in a second language and working
+  it.
+- Remember that many people here are writing in a second language and working
   on this in their own time.
 
 ## What is not
