@@ -1,7 +1,7 @@
 # Packaging
 
-`./install.sh` from the README installs for one user. This page covers a
-system-wide install, an APT repository, and extensions.gnome.org.
+`./install.sh` from the README installs for one user. The routes below are for
+everyone on a machine, or for a package manager.
 
 ## System-wide (.deb)
 
@@ -24,16 +24,22 @@ gnome-extensions enable agent-usage@pgiahuy.github.io
 Do not also run `install.sh`. You would get a second copy in `$HOME`, which
 takes precedence.
 
+After upgrading the package, a collector that is already running keeps the old
+code until it restarts: `systemctl --user restart agent-usage`, or the next
+login.
+
 If the indicator does not appear, run `/usr/share/agent-usage/doctor.sh`.
 
-To remove it: `sudo apt remove agent-usage`. Each user's
-`~/.cache/agent-usage` is left behind; it holds only readings and icons.
+To remove it: `sudo apt remove agent-usage`. Each user keeps
+`~/.cache/agent-usage`, the extension's settings in dconf, and its entry in the
+list of enabled extensions.
 
 ## APT repository
 
-`build-apt-repo.sh` builds a signed repository in `docs/apt/`, which GitHub
-Pages can serve from the `main` branch (Settings, Pages, source `main`, folder
-`/docs`). Users then get the package, and its updates, through `apt`.
+`build-apt-repo.sh` builds a repository in `docs/apt/`, signed when
+`AGENT_USAGE_GPG_KEY` names a key. GitHub Pages can serve it from the `main`
+branch (Settings, Pages, source `main`, folder `/docs`), and users then get the
+package and its updates through `apt`.
 
 To publish:
 
@@ -44,10 +50,10 @@ AGENT_USAGE_GPG_KEY=<that id> ./build-apt-repo.sh
 git add docs/apt && git commit -m "publish 1.0.0" && git push
 ```
 
-The script signs only with the key `AGENT_USAGE_GPG_KEY` names, and publishes
-its public half, name and email included, as `docs/apt/agent-usage.asc`. Use a
-key made for this. Without a signature, users would have to mark the source
-`[trusted=yes]`, which turns off apt's check that the package came from you.
+The script publishes the key's public half, name and email included, as
+`docs/apt/agent-usage.asc`, so use a key made for this. Without a signature,
+users have to mark the source `[trusted=yes]`, which turns off apt's check that
+the package came from you.
 
 Each user then adds the source. The address below follows this repository's
 name as an example; nothing is published there.
@@ -63,32 +69,24 @@ sudo apt update && sudo apt install agent-usage
 
 To publish a new version, run `build-apt-repo.sh` again and commit. The
 repository URL must not contain spaces: apt splits `sources.list` lines on
-whitespace, and fails with "Release file not found".
-
-A Launchpad PPA is the other option. It builds from a signed source upload and
-needs a Launchpad account.
+whitespace and then reports that the repository has no Release file.
 
 ## extensions.gnome.org
 
-The store takes a zip and compiles the schema itself, which is why
-`gschemas.compiled` is not in the repository:
+The store takes a zip. `gnome-extensions pack` includes `prefs.js` and the
+`schemas/` folder on its own; the UI module has to be named:
 
 ```sh
 cd extension
-gnome-extensions pack . \
-  --extra-source="$(basename "$(ls ui-*.js | sort -V | tail -1)")" \
-  --extra-source=prefs.js \
-  --schema=schemas/org.gnome.shell.extensions.agent-usage.gschema.xml
+gnome-extensions pack . --extra-source="$(ls ui-*.js | sort -V | tail -1)"
 ```
 
-Two things to settle before submitting:
+`gschemas.compiled` is not in the repository because `install.sh` and
+`build-deb.sh` each compile it.
 
-- **The loader.** `extension.js` imports whichever `ui-<n>.js` has the highest
-  number, which is what lets `install.sh` upgrade without a logout. The review
-  guidelines say nothing about a dynamic import of a computed path, so whether
-  review accepts it is not known. A static import of a single `ui.js` would
-  settle the question, at the cost of a logout on every upgrade. Issue #19
-  tracks the decision.
-- **`shell-version`** must list every GNOME Shell version you intend to
-  support. The store offers the extension only to those, and the shell refuses
-  it on any other.
+One thing to settle before submitting: the loader. `extension.js` imports
+whichever `ui-<n>.js` has the highest number, which is what lets `install.sh`
+upgrade without a logout. The review guidelines say nothing about a dynamic
+import of a computed path, so whether review accepts it is not known. A static
+import of a single `ui.js` would settle the question, at the cost of a logout
+on every upgrade. Issue #19 tracks the decision.

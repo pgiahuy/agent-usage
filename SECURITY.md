@@ -26,12 +26,18 @@ The collector runs as your user, with no elevated privileges. It:
   Code when you sign in;
 - **reads session logs** under `~/.claude/projects/` and
   `~/.kimi-code/sessions/`, which contain your prompts and the models' replies;
-- **sends a bearer token** to `api.anthropic.com` and `api.kimi.com`, and on an
-  explicit Refresh to `auth.kimi.com`;
+- **sends the access token** as a bearer header to `api.anthropic.com` and
+  `api.kimi.com`, and on an explicit Refresh **posts Kimi's refresh token** to
+  `auth.kimi.com`, or to the https host `KIMI_CODE_OAUTH_HOST` names;
 - **writes** inside `~/.cache/agent-usage`, and on an explicit Kimi refresh,
-  Kimi's credentials file;
-- **runs** `claude auth status` and at most one minimal `claude -p` prompt on
-  an explicit Refresh, so that Claude Code renews its own token.
+  Kimi's credentials file, a temporary file beside it, and Kimi's lock
+  directory `~/.kimi-code/oauth/kimi-code.lock`;
+- **reads** `/proc/*/cmdline` and `/proc/*/exe` on a Kimi refresh, to check
+  that no `kimi` process is running;
+- **runs** `gsettings get` for its settings on every pass, and on an explicit
+  Refresh, only when Claude's token is expired or refused, `claude auth status`
+  and at most one minimal `claude -p` prompt per renewal, so that Claude Code
+  renews its own token.
 
 It sends nothing anywhere else and collects no telemetry.
 
@@ -47,13 +53,14 @@ A change that removes one of these needs a stated reason:
 - **Kimi's credentials file is written atomically at mode 0600**, only under
   the lock Kimi Code itself uses, and never while a `kimi` process runs. Kimi
   rotates its refresh token, so two refreshes racing would sign the user out.
-- **The timed loop never touches a token.** Only Refresh renews one: a token
-  that has expired, or a Claude token the server has refused.
+- **The timed loop never renews a token.** Only Refresh does: a token that has
+  expired, or a Claude token the server has refused.
 - **The OAuth host must be https.**
 - **Only the usage part of Kimi's reply is cached.** The rest carries account
   and billing identifiers, so only its key names are kept.
 - **The GNOME Shell extension makes no network calls and parses no logs.** It
-  only reads one small JSON file from the collector.
+  reads `state.json`, the ring icons and its settings, and writes one empty
+  file to ask the collector for a refresh.
 
 ## Out of scope
 

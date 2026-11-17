@@ -12,9 +12,9 @@ Claude Code and Kimi Code plan usage in the GNOME top bar.
   from the provider's own API, never estimated: Claude Code's 5-hour and weekly
   windows, Kimi Code's 5-hour window and plan. Bars turn amber at 75% and red
   at 90%.
-- **Tokens and requests** today and over the last 7 days, per model, counted
-  from the local session logs. These keep working when a quota endpoint does
-  not.
+- **Tokens and requests** today and over the last 7 days, counted from the
+  local session logs, which keep working when a quota endpoint does not. The
+  terminal view also splits today by model.
 - **Says how old the figures are.** Each agent shows when its quota was last
   fetched, and a reading that could not be refreshed is marked as last known.
 - **A terminal view**, `agent-usage`, with the same reading on any desktop.
@@ -60,8 +60,9 @@ For a system-wide `.deb` or an APT repository, see
 
 ## Usage
 
-Click the indicator for the popup. **Refresh** fetches the quota now instead of
-at the next check, and renews a token that has expired.
+Click the indicator for the popup. **Refresh** fetches the quota now rather
+than at the next check, unless the last reading is under 30 seconds old or the
+provider is rate-limiting, and renews a token that has expired.
 
 The settings are under Agent Usage in the Extensions app: how often to check
 quota (2 to 60 minutes, default 5), which agents to show, the popup layout
@@ -76,13 +77,16 @@ agent-usage --daemon   # the collector, in the foreground
 ```
 
 If Claude Code or Kimi Code keeps its data elsewhere, set `CLAUDE_CONFIG_DIR`
-or `KIMI_CODE_HOME` in `~/.config/environment.d/agent-usage.conf`. A systemd
-user service does not read your shell profile.
+or `KIMI_CODE_HOME` in `~/.config/environment.d/agent-usage.conf`, since a
+systemd user service does not read your shell profile:
 
 ```
 CLAUDE_CONFIG_DIR=/data/claude
 KIMI_CODE_HOME=/data/kimi-code
 ```
+
+Then log out and back in, or run
+`systemctl --user daemon-reload && systemctl --user restart agent-usage`.
 
 ## Troubleshooting
 
@@ -109,25 +113,26 @@ Run the read-only check first. It names the problem and the command to fix it.
 ## Uninstall
 
 ```sh
-./uninstall.sh           # keeps ~/.cache/agent-usage
-./uninstall.sh --purge   # removes it too
+./uninstall.sh           # keeps the cache and the settings
+./uninstall.sh --purge   # also deletes ~/.cache/agent-usage and resets the settings
 ```
 
-The indicator leaves the panel at once.
+The indicator leaves the panel at once, or at the next login if GNOME Shell
+cannot unload it.
 
 ## Privacy
 
-The collector talks only to the providers, with your own token: quota checks
-to `api.anthropic.com` and `api.kimi.com`, and on Refresh, a token renewal.
-There is no telemetry. [SECURITY.md](SECURITY.md) lists exactly what is read, sent and
-written.
+The collector talks only to the providers, with your own credentials: quota
+checks to `api.anthropic.com` and `api.kimi.com`, and on Refresh, a token
+renewal. There is no telemetry. [SECURITY.md](SECURITY.md) lists what it reads,
+sends and writes, and how to report a vulnerability.
 
 ## Contributing
 
 Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md)
-and [docs/hacking.md](docs/hacking.md). Report security problems privately, as
-described in [SECURITY.md](SECURITY.md). Participation is covered by the
-[code of conduct](CODE_OF_CONDUCT.md).
+and [docs/hacking.md](docs/hacking.md). Participation is covered by the
+[code of conduct](CODE_OF_CONDUCT.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

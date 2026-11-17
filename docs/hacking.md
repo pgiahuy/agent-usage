@@ -5,25 +5,27 @@
 - **The collector** (`daemon/`, `agent-usage --daemon`) does all the work:
   it scans the session logs, asks the quota endpoints, draws the ring icons,
   and writes one JSON file, `~/.cache/agent-usage/state.json`.
-- **The extension** (`extension/`) only reads that file and draws it. GNOME
-  Shell never parses logs or makes a network call, and if the collector stops,
-  the panel says so instead of hanging.
+- **The extension** (`extension/`) draws that file, and asks for a refresh by
+  writing an empty trigger file. GNOME Shell never parses logs or makes a
+  network call. If the collector stops, the panel keeps the last reading and
+  its age keeps growing; with no `state.json` at all, it says the daemon is not
+  running.
 
 Token counts update every 20 seconds. Quota is checked every 5 minutes by
 default (`quota-interval`), and each agent's header shows how old its figures
 are. The popup watches `state.json`, so it redraws as soon as the file changes,
-and re-reads it every 60 seconds regardless. Refresh asks for quota at once.
+and re-reads it every 60 seconds regardless. Refresh asks for quota at once,
+unless the last reading is under 30 seconds old or a backoff is in force.
 
 Anthropic's usage endpoint rate-limits hard. On a 429 the collector backs off,
 doubling from 60 seconds up to 15 minutes, and keeps the last reading on screen.
 
 Kimi's usage endpoint is undocumented. The collector probes a short list of
-paths, remembers the one that returns percentages, and caches only the usage
-part of the reply in `~/.cache/agent-usage/kimi-raw.json`; for the rest, which
-holds account and billing ids, it keeps only the key names.
+paths, remembers the one that returns percentages, and keeps the usage part of
+the last reply in `~/.cache/agent-usage/kimi-raw.json` for debugging.
 
-A request carrying a token never follows a redirect, since `urllib` would copy
-the `Authorization` header to the new host. The cache directory is mode 0700.
+The security-relevant rules, such as no redirects and the private cache
+directory, are in [SECURITY.md](../SECURITY.md).
 
 ## Layout
 
@@ -63,7 +65,8 @@ a `Provider`. `providers/base.py` documents each field:
 Then add it to `PROVIDERS` in `providers/__init__.py`, to `TOOLS` in
 `extension/prefs.js`, and to the ids in the `hidden-tools` description in the
 schema. The extension draws whatever `state.json` lists, so it needs nothing
-else.
+else. The ring and the panel badge use the limit whose label starts with
+"5-hour"; an agent without one gets a grey dot and its token count.
 
 Get deduplication right. Claude Code replays earlier messages into a resumed
 session's log, and Kimi Code writes both a per-turn and a per-session usage
@@ -77,12 +80,13 @@ The collector uses the token each agent saved at sign-in:
 - `~/.claude/.credentials.json`. Claude Code renews it as you use it, so it is
   usually valid.
 - `~/.kimi-code/credentials/kimi-code.json`. Kimi's access token lasts 15
-  minutes, so on the timed loop Kimi's bars appear only if `kimi` ran recently.
+  minutes, so the timed loop refreshes Kimi's figures only while `kimi` has run
+  in the last 15 minutes; otherwise the last reading stays, marked last known,
+  until its window resets.
 
-Only Refresh renews a token (`renew=True` in `quota.fetch()`); the timed loop
-never does. Refresh renews an expired token. It also renews a token the server
-refuses with a 401 before it has expired, once, and retries only if the stored
-token actually changed.
+Only Refresh renews a token (`renew=True` in `quota.fetch()`): an expired one,
+and, once, one the server refuses with a 401, retrying only if the stored token
+changed.
 
 - **Kimi** (`renew()` in `providers/kimi.py`) refreshes at `auth.kimi.com` the
   way Kimi Code does. The refresh token rotates, so a refresh racing Kimi Code's
@@ -131,19 +135,12 @@ Other tunables are constants:
 | Claude limits not shown | `_SKIP_KINDS` in `providers/claude.py` |
 | Card and bar widths, spinner speed | the top of `ui-<n>.js`, and `stylesheet.css` |
 
-After editing a Python file, run `systemctl --user restart agent-usage`.
+After changing the collector, run `./install.sh`, which copies it and restarts
+the service.
 
 ## Tests
 
-```sh
-python3 -m unittest discover -s tests
-ruff check daemon tests
-shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in
-```
-
-The tests point every path the collector uses at a temporary directory and
-talk to local HTTP servers, so they never read real tokens or logs. CI also
-parses the JavaScript, compiles the schema and builds the `.deb`.
+The checks, and what CI runs, are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Shipping a UI change
 
@@ -152,14 +149,15 @@ a UI file in place has no effect until the next login. `extension.js` therefore
 imports the highest-numbered `ui-<n>.js` it finds, and a UI change reaches a
 running shell under the next number.
 
-`install.sh` does this on an upgrade: if the UI file changed, it installs it as
-one number above the highest present and toggles the extension; if only
+`install.sh` does this on an upgrade: if the UI file changed, it installs it
+under a number above every one present and toggles the extension; if only
 `stylesheet.css` changed, it toggles without renaming, since the stylesheet is
-re-read on enable. In the repository the UI file keeps its number. By hand:
+re-read on enable. In the repository the UI file keeps its number. By hand,
+copy the installed `ui-<n>.js` to `ui-<n+1>.js`, edit that, and toggle:
 
 ```sh
 cd ~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io
-cp ui-3.js ui-4.js && $EDITOR ui-4.js
+cp ui-6.js ui-7.js && $EDITOR ui-7.js
 gnome-extensions disable agent-usage@pgiahuy.github.io
 gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
