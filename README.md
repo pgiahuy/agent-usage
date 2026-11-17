@@ -7,6 +7,8 @@
 Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
 spent, when it resets, and how many tokens went out today and over the week.
 
+![The panel indicator and its popup, in the shell's dark style on the left and its light style on the right](docs/screenshot.png)
+
 Percentages are **consumed**, from each provider's own API, not an estimate
 derived from the logs. Token counts come from the local session logs, so they
 keep working when a quota endpoint does not.

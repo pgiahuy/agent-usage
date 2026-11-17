@@ -39,7 +39,9 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
 - `tools/doctor.sh`, a read-only check that says why the panel indicator is
   not showing and gives the command for each thing it finds. It ships in the
   `.deb` as well, at `/usr/share/agent-usage/doctor.sh`, since a package
-  install has no checkout to run it from.
+  install has no checkout to run it from, and it finds the extension in
+  either place it can be installed, with advice to match. A collector still
+  on its first pass is reported as working, not as broken.
 - A test suite and CI: unittest on Python 3.8, 3.12 and 3.13, ruff,
   shellcheck, a JavaScript parse check, a schema compile check and a `.deb`
   build. The tests point every path the collector touches at a temporary
@@ -51,6 +53,17 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
 
 ### Fixed
 
+- The popup was close to unreadable when the shell used its light style, which
+  is the default on Ubuntu: the figures, labels, tiles, bar tracks and
+  separator were all drawn for a dark background, and the figures fell to
+  1.2:1 against white. It now follows the shell's style, including when that
+  changes while it is open. The panel indicator is unchanged: Ubuntu keeps the
+  top bar dark in both styles, but upstream GNOME lights it as well, and the
+  indicator is not yet adjusted for that.
+- On Python 3.8 to 3.10 a reset time ending in `Z` could not be parsed. The row
+  then showed no reset time, and a window that had rolled over kept its old
+  percentage on screen as though it were current. Kimi's stamps were already
+  handled this way; Claude's were not.
 - A session log belongs to another program, so a line the extractor could not
   read used to stop the collector writing its state file at all, and because
   the byte offset was committed only after the sweep, the same line broke
