@@ -31,8 +31,9 @@ body:
     attributes:
       label: What the terminal view says
       description: |
-        `agent-usage` prints the same reading the panel draws, so it separates a
-        collector problem from a drawing one. Paste the output.
+        `agent-usage` works out a reading with the same code as the service,
+        but on its own. If it is right and the panel is wrong, the fault is in
+        the service or the extension. Paste the output.
       render: text
     validations:
       required: true
@@ -48,7 +49,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: The contents of VERSION, or the commit you are on.
+      description: The contents of VERSION, the commit you are on, or `apt show agent-usage` for a package install.
     validations:
       required: true
 

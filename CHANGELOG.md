@@ -4,144 +4,64 @@ Notable changes per release. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-Everything below has landed on `main` since 1.0.0 and is not in a release yet.
-
-### Changed
-
-- **The project is now `agent-usage`, renamed from `ai-usage`.** That covers
-  the extension UUID, the command, the systemd unit, the apt package and the
-  cache directory, so a 1.0.0 install is not upgraded in place by this: it is
-  a separate install, and the old one is removed with its own `uninstall.sh`.
-- The collector is one module per concern instead of one large file, with each
-  agent's log format, quota endpoint and token handling behind a provider
-  interface. Adding an agent is now one file plus a registry entry.
-- The AppIndicator tray fallback is gone. The GNOME Shell extension draws the
-  panel, and the terminal view covers everything else.
-- The release number lives in a `VERSION` file, the only place it is written
-  down. Both build scripts read it, so the `.deb` and the APT repository index
-  cannot describe different versions of the same artifact.
+## [Unreleased]
 
 ### Added
 
-- Preferences in the Extensions app, backed by a GSettings schema the
-  collector reads too, so there is one store and nothing to keep in sync: how
-  often quota is checked, which agents to show, the popup layout (tiles,
-  compact or large numbers) and the panel style (ring or text).
-- Token renewal on an explicit Refresh. Kimi is refreshed at `auth.kimi.com`
-  under Kimi's own lock and never while a `kimi` process runs, with the result
-  written back to its credentials file; Claude is left to renew its own, via
-  `claude auth status` and at most one minimal `claude -p` prompt. The timed
-  loop still never touches a token.
-- An agent that is not installed is left out of the panel entirely, rather
-  than drawn as an empty block.
-- `tools/doctor.sh`, a read-only check that says why the panel indicator is
-  not showing and gives the command for each thing it finds. It ships in the
-  `.deb` as well, at `/usr/share/agent-usage/doctor.sh`, since a package
-  install has no checkout to run it from, and it finds the extension in
-  either place it can be installed, with advice to match. A collector still
-  on its first pass is reported as working, not as broken.
-- A test suite and CI: unittest on Python 3.8, 3.12 and 3.13, ruff,
-  shellcheck, a JavaScript parse check, a schema compile check and a `.deb`
-  build. The tests point every path the collector touches at a temporary
-  directory, so they never read real tokens or logs.
-- Documentation split out of the readme into `docs/packaging.md` and
-  `docs/hacking.md`, plus a contributing guide, a security policy, a code of
-  conduct, this changelog, issue and pull request templates, and an
-  `.editorconfig`.
+- Preferences in the Extensions app: how often to check quota, which agents to
+  show, the popup layout (tiles, compact or large numbers) and the panel style.
+- Refresh renews an expired token, and a Claude token the server refuses
+  before it expires. Kimi is refreshed under its own lock and never while
+  `kimi` runs; Claude Code renews its own.
+- Each agent's header shows how old its quota figures are.
+- Agents that are not installed are left out.
+- `tools/doctor.sh`, a read-only check of why the indicator is missing, also
+  shipped in the `.deb`.
+
+### Changed
+
+- Renamed from `ai-usage` to `agent-usage`: the command, the extension UUID,
+  the service, the package and the cache directory. A 1.0.0 install is not
+  upgraded in place; remove it with its own `uninstall.sh`.
+- Running `install.sh` again upgrades without a logout in most cases.
+- Failure reasons are shorter: `connection refused`, not
+  `[Errno 111] Connection refused`.
+
+### Removed
+
+- The AppIndicator tray, `--tray`. The extension and the terminal view cover it.
 
 ### Fixed
 
-- The popup was close to unreadable when the shell used its light style, which
-  is the default on Ubuntu: the figures, labels, tiles, bar tracks and
-  separator were all drawn for a dark background, and the figures fell to
-  1.2:1 against white. It now follows the shell's style, including when that
-  changes while it is open. The panel indicator is unchanged: Ubuntu keeps the
-  top bar dark in both styles, but upstream GNOME lights it as well, and the
-  indicator is not yet adjusted for that.
-- On Python 3.8 to 3.10 a reset time ending in `Z` could not be parsed. The row
-  then showed no reset time, and a window that had rolled over kept its old
-  percentage on screen as though it were current. Kimi's stamps were already
-  handled this way; Claude's were not.
-- A session log belongs to another program, so a line the extractor could not
-  read used to stop the collector writing its state file at all, and because
-  the byte offset was committed only after the sweep, the same line broke
-  every later pass too. The panel froze for as long as that line was in the
-  log.
-- A log file replaced in place at the same size or larger was resumed from the
-  middle, which lost every record in it for good. Offsets key on the inode
-  and on the file's first bytes, since a replacement can be handed the inode
-  the old file just released.
-- A cached reading could raise in four places and take the whole state file
-  down with it, including the other agent and the token counts that were fine.
-  The shape is checked where the file is read, and the daemon's guard is per
-  agent.
-- The 429 backoff never grew. It was derived from the time left on the
-  previous deadline, which is always zero by the time the code runs, so every
-  rejection produced the same 60s and the 900s ceiling was unreachable.
-- Kimi's credentials file was not reliably private: the mode on a create is
-  ignored when the file already exists, so residue from a crashed run kept its
-  own mode, and the open followed a symlink left at that path.
-- Kimi's refresh lock was never re-stamped, so a hold that ran long, which one
-  slow DNS lookup causes, let kimi take the lock and refresh at the same time
-  and sign the user out. The lock is kept alive while held, the write happens
-  only while we still own it, and the teardown no longer removes a lock that
-  has become someone else's.
-- A refresh rolled the credentials file back to the copy read before the
-  request, discarding anything kimi wrote meanwhile.
-- One Refresh could hold the collector's only thread for over two minutes, so
-  SIGTERM did not land and `systemctl stop` ended in a SIGKILL. The renew and
-  the endpoint sweep each work to one budget now, and a timed-out `claude` no
-  longer leaves its children behind.
-- Clearing the cache directory counted as pressing Refresh, which renews
-  tokens: a real Kimi rotation and a `claude` prompt nobody asked for.
-- The kimi-is-running check looked at argv[0] only, so a wrapped install was
-  reported as not running, dropping the first defence the refresh relies on.
-- `quota-interval` had no bounds in code, and dconf does not enforce the
-  schema range on a value written straight into it, so a 0 asked for a quota
-  call every 20 seconds.
-- The panel trusted the shape of its state file: a malformed one threw out of
-  the render, which killed the poll timer and left `disable()` logging a GLib
-  critical. Colours are checked before reaching an St style and an icon path
-  must be one the collector wrote.
-- Preferences leaked its settings handlers for the life of the process, and
-  the extension metadata had no url, which is the only place someone who
-  installed it on its own learns a collector is needed.
-- The tray fallback called a function that did not exist, so it raised on its
-  first draw. The tray is since gone, but the same mistake would have reached
-  the panel.
-- A cached quota reading outlived the window it measured. Once its reset time
-  had passed the window had rolled over, yet the old percentage was still
-  drawn as current, and the panel badge carried it with no last-known mark.
-  Such rows are now dropped rather than zeroed, because what the new window
-  holds is unknown until a fetch succeeds.
-- The collector guarded its state write but not the quota calls above it, so
-  an unexpected error ended the process and `Restart=always` respawned it
-  every five seconds for as long as the cause lasted.
-- Installing an update no longer needs a logout: the installer reloads the
-  panel indicator itself, and waits for each step of the reload so an enable
-  sent during a pending disable cannot be lost.
-- The installer compared the running GNOME Shell against a version written
-  into the script, and only complained when it was too old. A shell newer than
-  the extension declares was installed over in silence, and the shell then
-  refused to load the extension without saying why. The check now reads the
-  range out of `metadata.json` and reports either side of it.
-- The installer said nothing when `disable-user-extensions` was on. That one
-  switch stops every user extension loading, with nothing in any log to
-  explain the empty panel, which made a clean machine look like a broken
-  install. It is now reported, with the command to turn extensions back on,
-  and deliberately not flipped: that would also switch back on every other
-  extension the user had turned off on purpose.
+- The popup was close to unreadable under the shell's light style, the default
+  on Ubuntu.
+- Running `install.sh` again did not restart the collector, which kept running
+  the old code until the next login.
+- When quota could not be fetched, a window that had already reset kept its old
+  percentage, unmarked in the panel.
+- One log line of an unexpected shape stopped the panel updating for as long
+  as the line stayed in the log.
+- A log file replaced in place, at the same size or larger, lost its records.
+- A malformed cached reading stopped the panel updating.
+- A malformed state file left the popup empty until the next valid one.
+- An unexpected error from a quota check crashed the collector, which then
+  restarted every five seconds.
+- The 429 backoff stayed at 60 seconds instead of doubling up to 15 minutes.
+- Two rare deduplication gaps: a Kimi turn that differed from another only in
+  cache writes was dropped, and a Claude record with no ids was counted again
+  when its session was resumed.
+- The installer did not warn when GNOME Shell was newer than the extension
+  supports, or when user extensions were switched off.
 
 ### Security
 
-- A request carrying a token no longer follows redirects. `urllib` copies the
-  `Authorization` header onto the redirected request, to any host and even
-  from https down to plain http, so a redirect is now returned as an error.
-- The cache directory is kept private to the user, and only the usage part of
-  Kimi's reply is cached: the rest carries account and billing identifiers, so
-  only its key names are kept.
+- Requests carrying a token no longer follow redirects, which could send the
+  token to another host.
+- The cache directory is private to the user, and only the usage part of
+  Kimi's reply is cached, without its account and billing identifiers.
+- `build-apt-repo.sh` signs only with the key `AGENT_USAGE_GPG_KEY` names.
+  1.0.0 fell back to the first secret key in the keyring and published its
+  public half.
 
 ## [1.0.0] - 2026-08-13
 
@@ -165,4 +85,5 @@ First release, under the name `ai-usage`.
 - A per-user installer, a `.deb` for system-wide installs, and a builder for a
   signed APT repository.
 
+[Unreleased]: https://github.com/pgiahuy/agent-usage/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/pgiahuy/agent-usage/releases/tag/v1.0.0

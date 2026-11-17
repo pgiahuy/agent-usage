@@ -4,44 +4,33 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![GNOME Shell 48 to 50](https://img.shields.io/badge/GNOME%20Shell-48%20to%2050-4a86cf.svg)](https://release.gnome.org/)
 
-Claude Code and Kimi Code usage in the GNOME top bar: how much of each plan is
-spent, when it resets, and how many tokens went out today and over the week.
+Claude Code and Kimi Code plan usage in the GNOME top bar.
 
-![The panel indicator and its popup, in the shell's dark style on the left and its light style on the right](docs/screenshot.png)
+![The panel indicator and its popup, in the shell's dark style and its light style](docs/screenshot.png)
 
-Percentages are **consumed**, from each provider's own API, not an estimate
-derived from the logs. Token counts come from the local session logs, so they
-keep working when a quota endpoint does not.
-
-| Tool | Bars | Source |
-| --- | --- | --- |
-| Claude Code | 5-hour, Weekly | `GET api.anthropic.com/api/oauth/usage` |
-| Kimi Code | 5-hour, Plan | `GET api.kimi.com/coding/v1/usages` |
-| both | today / 7 days tokens, request counts | local `*.jsonl` session logs |
-
-Bars turn amber at 75% consumed and red at 90%.
+- **Plan usage from the provider.** How much of each quota window is used, read
+  from the provider's own API, never estimated: Claude Code's 5-hour and weekly
+  windows, Kimi Code's 5-hour window and plan. Bars turn amber at 75% and red
+  at 90%.
+- **Tokens and requests** today and over the last 7 days, counted from the
+  local session logs, which keep working when a quota endpoint does not. The
+  terminal view also splits today by model.
+- **Says how old the figures are.** Each agent shows when its quota was last
+  fetched, and a reading that could not be refreshed is marked as last known.
+- **A terminal view**, `agent-usage`, with the same reading on any desktop.
 
 ## Requirements
 
-- GNOME Shell 48, 49 or 50 for the panel indicator (developed on 50). The
-  shell refuses to load an extension outside the range `metadata.json`
-  declares, so a newer shell needs that list extended first.
-- Python 3.8+, standard library only
-- systemd user session (optional: without it, run the collector yourself)
-- Claude Code and/or Kimi Code signed in
+- GNOME Shell 48, 49 or 50 for the panel indicator. The shell will not load an
+  extension whose `metadata.json` does not list its version.
+- Python 3.8 or newer, standard library only.
+- A systemd user session to run the collector. Without one, run
+  `agent-usage --daemon` yourself.
+- Claude Code or Kimi Code, signed in with a subscription. An API-key sign-in
+  gives token counts but no quota bars, because the quota is per plan.
 
-Nothing needs configuring and there is no API key to paste: the collector
-reads the token each tool already wrote when you signed in. A tool that is not
-signed in shows token counts only, with no quota bars; one that is not
-installed is not shown at all. Signing in to Claude Code with an API key
-rather than a subscription also gives no quota bars, because the quota
-endpoint measures a plan.
-
-The Extensions app has the optional settings, under Agent Usage: how often
-quota is checked, which tools to show, the popup layout (tiles, compact or
-large numbers) and the panel style (ring or text).
-
-The terminal view (`agent-usage`) works anywhere, GNOME or not.
+There is no key to paste: the collector uses the token each tool saved when you
+signed in. A tool that is not installed is not shown.
 
 ## Install
 
@@ -50,115 +39,101 @@ git clone https://github.com/pgiahuy/agent-usage.git && cd agent-usage
 ./install.sh
 ```
 
-Then **log out and back in once**: GNOME Shell only looks for new extensions
-when the session starts, and offers no way to load one later.
+Log out and back in once. GNOME Shell only picks up a new extension at login.
 
-Re-running `./install.sh` is the upgrade path, and it needs no logout: it
-reloads the panel indicator itself. The exception is an update that changes
-`extension.js`, `metadata.json` or whether there is a preferences page, which
-GNOME Shell reads only at login; the installer says so when that happens.
+Everything goes under your home directory:
 
-Everything lands under `$HOME`, no root and no system packages:
+| Path | Contents |
+| --- | --- |
+| `~/.local/share/agent-usage/` | the collector |
+| `~/.local/bin/agent-usage` | the command |
+| `~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io/` | the extension |
+| `~/.config/systemd/user/agent-usage.service` | the service |
+| `~/.cache/agent-usage/` | readings and ring icons |
 
-```
-~/.local/share/agent-usage/                            collector
-~/.local/bin/agent-usage                               command
-~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io/   extension
-~/.config/systemd/user/agent-usage.service             service
-~/.cache/agent-usage/                                  readings, ring icons
-```
+To upgrade, run `./install.sh` again. It reloads the indicator without a
+logout, except when `extension.js` or `metadata.json` changed or the previous
+install had no preferences page; it says so when that happens.
 
-For a system-wide install with a `.deb`, or publishing to an APT repository,
-see [docs/packaging.md](docs/packaging.md).
+For a system-wide `.deb` or an APT repository, see
+[docs/packaging.md](docs/packaging.md).
 
-## Uninstall
+## Usage
+
+Click the indicator for the popup. **Refresh** fetches the quota now rather
+than at the next check, unless the last reading is under 30 seconds old or the
+provider is rate-limiting, and renews a token that has expired.
+
+The settings are under Agent Usage in the Extensions app: how often to check
+quota (2 to 60 minutes, default 5), which agents to show, the popup layout
+(tiles, compact or large numbers) and the panel style (ring or text).
+
+From a terminal:
 
 ```sh
-./uninstall.sh          # leaves the cache
-./uninstall.sh --purge  # removes it too
+agent-usage            # the reading
+agent-usage --json     # the reading as JSON
+agent-usage --daemon   # the collector, in the foreground
 ```
 
-The indicator leaves the panel at once, no logout needed.
-
-## Terminal
-
-```
-$ agent-usage
- CLAUDE
-   5-hour           █░░░░░░░░░   3%   resets Thu 04:09
-   Weekly           ██░░░░░░░░  18%   resets Tue 16:00
-   Today              670.3M tokens     3.0k req
-   ...
-
-$ agent-usage --json     # same reading, machine readable
-$ agent-usage --daemon   # the collector, in the foreground
-```
-
-## Data and privacy
-
-The collector reads, locally, `~/.claude/.credentials.json` and
-`~/.kimi-code/credentials/kimi-code.json` for the access tokens, and
-`~/.claude/projects/**/*.jsonl` and `~/.kimi-code/sessions/**/wire.jsonl` for
-token counts. It talks to `api.anthropic.com` and `api.kimi.com`, follows no
-redirects with a token attached, and writes inside `~/.cache/agent-usage`,
-which it keeps private to you. No telemetry.
-
-The timed refresh never touches a token. Only the popup's Refresh button
-renews an expired one: for Kimi, the collector refreshes it at `auth.kimi.com`
-the way `kimi` itself does, under Kimi's own lock and never while `kimi` is
-running, and writes the new token back to Kimi's credentials file; for Claude,
-it runs `claude auth status`, then if needed one minimal `claude -p` prompt,
-so Claude Code renews its own token.
-
-If a tool keeps its data elsewhere, the collector follows `CLAUDE_CONFIG_DIR`
-and `KIMI_CODE_HOME`. A systemd user service does not read `.bashrc`, so set
-them in `~/.config/environment.d/agent-usage.conf`:
+If Claude Code or Kimi Code keeps its data elsewhere, set `CLAUDE_CONFIG_DIR`
+or `KIMI_CODE_HOME` in `~/.config/environment.d/agent-usage.conf`, since a
+systemd user service does not read your shell profile:
 
 ```
 CLAUDE_CONFIG_DIR=/data/claude
 KIMI_CODE_HOME=/data/kimi-code
 ```
 
+Then log out and back in, or run
+`systemctl --user daemon-reload && systemctl --user restart agent-usage`.
+
 ## Troubleshooting
 
+Run the read-only check first. It names the problem and the command to fix it.
+
 ```sh
-./tools/doctor.sh      # read-only; says what is wrong and the command to fix it
+./tools/doctor.sh
 ```
 
-**Nothing in the panel.** Run the line above first. Almost always one of
-three things: the session has not been restarted since the install, user
-extensions are switched off for the whole session
-(`gsettings get org.gnome.shell disable-user-extensions` returns true), or
-GNOME Shell is outside the versions `extension/metadata.json` declares, in
-which case the shell refuses to load the extension and reports nothing.
+- **Nothing in the panel.** Usually one of: the session was not restarted
+  after the install; user extensions are switched off
+  (`gsettings get org.gnome.shell disable-user-extensions` prints `true`); or
+  GNOME Shell is newer than `extension/metadata.json` lists.
+- **"agent-usage daemon is not running".** Check
+  `systemctl --user status agent-usage` and
+  `journalctl --user -u agent-usage -n 50`.
+- **"rate limited, retrying in ...".** The provider limits how often its usage
+  endpoint is asked. The collector backs off on its own and keeps the last
+  reading on screen.
+- **Kimi shows "token expired".** Press Refresh. If it then says
+  "kimi is running", the token renews the next time that `kimi` session talks
+  to Kimi.
 
-**"agent-usage daemon is not running".** `systemctl --user status agent-usage`, and
-`journalctl --user -u agent-usage -n 50` for the reason.
+## Uninstall
 
-**Claude says "rate limited".** Expected after too many forced refreshes; it
-clears itself. The last known reading stays on screen, marked as such.
+```sh
+./uninstall.sh           # keeps the cache and the settings
+./uninstall.sh --purge   # also deletes ~/.cache/agent-usage and resets the settings
+```
 
-**Kimi says "token expired".** Press Refresh in the popup. If it says "kimi is
-running", the token renews on its own the next time that session talks to
-Kimi.
+The indicator leaves the panel at once, or at the next login if GNOME Shell
+cannot unload it.
+
+## Privacy
+
+The collector talks only to the providers, with your own credentials: quota
+checks to `api.anthropic.com` and `api.kimi.com`, and on Refresh, a token
+renewal. There is no telemetry. [SECURITY.md](SECURITY.md) lists what it reads,
+sends and writes, and how to report a vulnerability.
 
 ## Contributing
 
-Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md)
-has the checks to run and the house style;
-[docs/hacking.md](docs/hacking.md) has the module layout, the refresh and
-backoff rules, how to ship a UI change to a running shell, and how to add an
-agent. Everyone taking part is expected to follow the
-[code of conduct](CODE_OF_CONDUCT.md).
-
-Found a security problem? Please report it privately, not in an issue:
-[SECURITY.md](SECURITY.md).
-
-## Changes
-
-[CHANGELOG.md](CHANGELOG.md), and the current release number is in
-[VERSION](VERSION).
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md)
+and [docs/hacking.md](docs/hacking.md). Participation is covered by the
+[code of conduct](CODE_OF_CONDUCT.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)
