@@ -71,10 +71,12 @@ def extract(raw):
     out = int(u.get("output") or 0)
     cread = int(u.get("inputCacheRead") or 0)
     cwrite = int(u.get("inputCacheCreation") or 0)
+    # Every count is in the key: two turns in the same millisecond that differ
+    # only in what they wrote to the cache are still two turns.
     return (
         ms / 1000.0,
         d.get("model") or "unknown",
-        "%d|%d|%d|%d" % (ms, inp, out, cread),
+        "%d|%d|%d|%d|%d" % (ms, inp, out, cread, cwrite),
         inp,
         out,
         cread,
