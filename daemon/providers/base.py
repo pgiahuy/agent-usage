@@ -26,8 +26,10 @@ class Provider:
     # (token, timeout) -> {"limits": [...], ...}. May raise urllib errors or
     # quota.Unavailable; quota.fetch() turns those into a reason.
     fetch: Callable[[str, float], dict]
-    # () -> None once the token is valid again, else the reason it is not.
-    renew: Callable[[], Optional[str]]
+    # (rejected=None) -> None once the token is valid again, else the reason it
+    # is not. rejected is a token the server refused before it expired: the
+    # stored copy still looks valid then, so only a different one will do.
+    renew: Callable[..., Optional[str]]
 
     @property
     def installed(self):

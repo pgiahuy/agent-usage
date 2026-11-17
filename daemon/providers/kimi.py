@@ -430,7 +430,7 @@ def _lock_identity(path):
     return (st.st_dev, st.st_ino)
 
 
-def renew(timeout=4):
+def renew(timeout=4, rejected=None):
     """Refresh Kimi's token the way kimi itself does, under kimi's own lock.
 
     The refresh token rotates, so a refresh racing kimi's would leave one side
@@ -438,7 +438,15 @@ def renew(timeout=4):
     process is running, never without the lock, and a lock that is held is
     waited for by nobody: kimi stamps its lock every few seconds, and if it is
     there, kimi is refreshing and will write the result itself.
+
+    A token the server refused before it expired is left alone. Kimi's live
+    fifteen minutes, so it reaches "token expired" soon and that path renews
+    it; rotating the refresh token on a status code alone is not worth the
+    risk of the double rotation above. Declining comes first, so nothing is
+    checked or locked for it.
     """
+    if rejected is not None:
+        return "left to expire"
     if not OAUTH_HOST.startswith("https://"):
         return "oauth host is not https"
     if _kimi_running():

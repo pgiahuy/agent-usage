@@ -48,8 +48,9 @@ def read_token(path, key, exp_key, exp_unit, node=None):
 def fetch(provider, timeout=8, fresh_for=cache.FRESH_S, renew=False):
     """One provider's reading, as a dict with "ok" and either "limits" or "why".
 
-    renew=True lets an expired token be renewed first; only an explicit Refresh
-    asks for that, never the timed loop.
+    renew=True lets an expired token be renewed first, and a token the server
+    refuses be renewed once and tried again; only an explicit Refresh asks for
+    that, never the timed loop.
     """
     reading_name = "%s-quota.json" % provider.tag
     backoff_name = "%s-backoff.json" % provider.tag
@@ -68,25 +69,48 @@ def fetch(provider, timeout=8, fresh_for=cache.FRESH_S, renew=False):
     wait = cache.backoff_until(backoff_name) - time.time()
     if wait > 0:
         return {"ok": False, "why": "rate limited, retrying in %ds" % wait, "cached": cached}
+    reading, failure, code = _ask(provider, tok, timeout, backoff_name, cached)
+
+    # Refused although it has not expired: revoked, or replaced by a sign-in
+    # elsewhere. The stored copy still looks valid, which is why a renewal can
+    # report success without having changed anything, so the retry is decided
+    # here, on whether the stored token is now a different one.
+    if code == 401 and renew:
+        provider.renew(rejected=tok)
+        fresh, _ = provider.token()
+        if fresh and fresh != tok:
+            reading, failure, code = _ask(provider, fresh, timeout, backoff_name, cached)
+    if failure is not None:
+        return failure
+
+    out = {"ok": True, "v": cache.VERSION, "fetched_at": time.time()}
+    out.update(reading)
+    cache.write(reading_name, out)
+    return out
+
+
+def _ask(provider, tok, timeout, backoff_name, cached):
+    """One request, as (reading, None, None), or (None, failure, HTTP code or None).
+
+    Both attempts in fetch() come through here, so a 429 on a retry backs off
+    the same as on a first try.
+    """
     try:
         reading = provider.fetch(tok, timeout)
     except urllib.error.HTTPError as exc:
         net.discard(exc)
         if exc.code == 429:
             wait = cache.backoff_bump(backoff_name)
-            return {"ok": False, "why": "rate limited, retrying in %ds" % wait, "cached": cached}
-        return {"ok": False, "why": "HTTP %d" % exc.code, "cached": cached}
+            why = "rate limited, retrying in %ds" % wait
+            return None, {"ok": False, "why": why, "cached": cached}, 429
+        return None, {"ok": False, "why": "HTTP %d" % exc.code, "cached": cached}, exc.code
     except Unavailable as exc:
         cache.backoff_clear(backoff_name)
-        return {"ok": False, "why": str(exc), "cached": cached}
+        return None, {"ok": False, "why": str(exc), "cached": cached}, None
     except (urllib.error.URLError, ValueError, TimeoutError, OSError) as exc:
-        return {"ok": False, "why": net.why(exc), "cached": cached}
+        return None, {"ok": False, "why": net.why(exc), "cached": cached}, None
     cache.backoff_clear(backoff_name)
-
-    out = {"ok": True, "v": cache.VERSION, "fetched_at": time.time()}
-    out.update(reading)
-    cache.write(reading_name, out)
-    return out
+    return reading, None, None
 
 
 def reset_passed(iso, now=None):

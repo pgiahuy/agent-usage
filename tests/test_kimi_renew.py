@@ -206,6 +206,18 @@ class RenewTest(unittest.TestCase):
         self.assertEqual(FakeAuth.requests, [])
         self.assertTrue(os.path.isdir(kimi.REFRESH_LOCK))  # kimi's lock, left alone
 
+    def test_a_refused_token_that_has_not_expired_is_left_to_expire(self):
+        with open(kimi.CREDS, "w") as fh:
+            json.dump({"access_token": "LIVE", "refresh_token": "OLD_RT",
+                       "expires_at": int(time.time()) + 600}, fh)
+        before = self.creds()
+        # Declined before anything else is looked at, the running check included.
+        kimi._kimi_running = lambda: True
+        self.assertEqual(kimi.renew(rejected="LIVE"), "left to expire")
+        self.assertEqual(FakeAuth.requests, [])
+        self.assertFalse(os.path.exists(kimi.REFRESH_LOCK))
+        self.assertEqual(self.creds(), before)
+
     def test_kimi_running(self):
         kimi._kimi_running = lambda: True
         self.assertEqual(kimi.renew(), "kimi is running")
