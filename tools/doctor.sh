@@ -9,7 +9,20 @@
 set -uo pipefail
 
 UUID=agent-usage@pgiahuy.github.io
-EXT=${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID
+USER_EXT=${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$UUID
+SYS_EXT=/usr/share/gnome-shell/extensions/$UUID
+# GNOME Shell loads from both. The per-user copy shadows the system one, so it
+# is the one that runs when both are present.
+if [ -d "$USER_EXT" ]; then
+  EXT=$USER_EXT
+  REINSTALL="run ./install.sh again from the checkout"
+elif [ -d "$SYS_EXT" ]; then
+  EXT=$SYS_EXT
+  REINSTALL="reinstall the package: sudo apt install --reinstall agent-usage"
+else
+  EXT=$USER_EXT
+  REINSTALL="run ./install.sh from a checkout, or install the .deb"
+fi
 STATE=${XDG_CACHE_HOME:-$HOME/.cache}/agent-usage/state.json
 problems=0
 
@@ -38,14 +51,19 @@ if command -v gnome-shell >/dev/null 2>&1; then
       *",$running,"*) ok "the versions match" ;;
       *)
         bad "version mismatch: GNOME Shell $running is not in that list, so the"
-        bad "shell refuses to load the extension and reports nothing. Add"
-        bad "\"$running\" to shell-version in extension/metadata.json, run"
-        bad "./install.sh again, then log out and back in."
+        bad "shell refuses to load the extension and reports nothing."
+        if [ "$EXT" = "$SYS_EXT" ]; then
+          bad "The package needs a release that lists $running; check for one"
+          bad "at https://github.com/pgiahuy/agent-usage/releases"
+        else
+          bad "Add \"$running\" to shell-version in extension/metadata.json,"
+          bad "then $REINSTALL, and log out and back in."
+        fi
         ;;
     esac
   else
     bad "no metadata.json under $EXT, so the extension is not installed."
-    bad "Run ./install.sh"
+    bad "To install it, $REINSTALL."
   fi
 else
   bad "gnome-shell is not installed on this machine. The collector and the"
@@ -87,7 +105,7 @@ if [ -d "$EXT" ]; then
     if [ -e "$EXT/$f" ]; then
       ok "  $f"
     else
-      bad "  $f is missing. Run ./install.sh again."
+      bad "  $f is missing. To fix it, $REINSTALL."
     fi
   done
   newest_ui=""
@@ -97,10 +115,13 @@ if [ -d "$EXT" ]; then
   if [ -n "$newest_ui" ]; then
     ok "  $(basename "$newest_ui")"
   else
-    bad "  no ui-<n>.js, which is the whole user interface. Run ./install.sh"
+    bad "  no ui-<n>.js, which is the whole user interface. To fix it, $REINSTALL."
   fi
 else
-  bad "$EXT does not exist. Run ./install.sh"
+  bad "The extension is not installed in either place GNOME looks:"
+  bad "  $USER_EXT"
+  bad "  $SYS_EXT"
+  bad "To install it, $REINSTALL."
 fi
 
 if command -v gnome-extensions >/dev/null 2>&1; then
