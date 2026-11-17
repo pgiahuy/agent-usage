@@ -1,99 +1,56 @@
 # Packaging
 
-The per-user `./install.sh` in the README is the normal route. This page is
-for a shared machine, or for installing with the package manager.
+`./install.sh` from the README installs for one user. This page covers a
+system-wide install, an APT repository, and extensions.gnome.org.
 
 ## System-wide (.deb)
 
 ```sh
-./build-deb.sh                              # -> dist/agent-usage_1.0.0_all.deb
+./build-deb.sh                                  # -> dist/agent-usage_1.0.0_all.deb
 sudo apt install ./dist/agent-usage_1.0.0_all.deb
 ```
 
-The package puts the collector in `/usr/share/agent-usage`, the command in
-`/usr/bin`, the extension in `/usr/share/gnome-shell/extensions`, and the user
-service in `/usr/lib/systemd/user`. `postinst` runs `systemctl --global enable
-agent-usage.service`, so every user's session starts the collector at login.
+The package installs the collector in `/usr/share/agent-usage`, the command in
+`/usr/bin`, the extension in `/usr/share/gnome-shell/extensions` and the user
+service in `/usr/lib/systemd/user`. Its `postinst` enables the service for
+every user, so the collector starts at each login.
 
-The extension stays per-user, because GNOME extensions are per-user by nature:
-
-```sh
-gnome-extensions enable agent-usage@pgiahuy.github.io   # once per user, after one logout
-```
-
-Do not run `install.sh` as well, or you end up with two copies, one in
-`/usr` and one in `$HOME`, and the `$HOME` one wins on `PATH`.
-
-When the panel indicator does not appear, the diagnostic lands with the
-package, since there is no checkout to run it from:
+Each user then enables the extension once, after logging out and back in:
 
 ```sh
-/usr/share/agent-usage/doctor.sh
+gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
 
-Removal is `sudo apt remove agent-usage`. That leaves each user's
-`~/.cache/agent-usage`, which is just cached readings and icons.
+Do not also run `install.sh`. You would get a second copy in `$HOME`, which
+takes precedence.
 
-## extensions.gnome.org
+If the indicator does not appear, run `/usr/share/agent-usage/doctor.sh`.
 
-The store is where most people look for a GNOME extension, and it takes a zip
-rather than a repository. The schema goes in as source, not compiled: the
-store compiles it, which is why `gschemas.compiled` is not in the tree and why
-the installer and `build-deb.sh` each compile their own.
+To remove it: `sudo apt remove agent-usage`. Each user's
+`~/.cache/agent-usage` is left behind; it holds only readings and icons.
 
-```sh
-cd extension
-gnome-extensions pack . \
-  --extra-source="$(basename "$(ls ui-*.js | sort -V | tail -1)")" \
-  --extra-source=prefs.js \
-  --schema=schemas/org.gnome.shell.extensions.agent-usage.gschema.xml
-```
+## APT repository
 
-Two things to settle before submitting.
+`build-apt-repo.sh` builds a signed repository in `docs/apt/`, which GitHub
+Pages can serve from the `main` branch (Settings, Pages, source `main`, folder
+`/docs`). Users then get the package, and its updates, through `apt`.
 
-The loader has to go. `extension.js` picks its entry point by listing the
-directory and importing the highest-numbered `ui-<n>.js`. Store review is a
-person reading the zip, and the rule is that the code they read is the code
-that runs, so anything shaped like finding a file and loading it is refused.
-Replacing it with a static `import` of a single `ui.js` is the fix, and it
-costs the no-logout upgrade in `install.sh`, which exists only because that
-numbering gives the shell a URI it has not cached yet. A store install
-upgrades at the next login either way, so the two routes want different
-things here.
-
-`shell-version` has to cover the shells you intend to support. The store shows
-an extension only to the versions listed, and the shell refuses to load it
-anywhere else.
-
-## `apt install agent-usage`, from your own repository
-
-For plain `apt install agent-usage`, and `apt upgrade` picking up new versions
-along with everything else, the package has to live in a repository the
-machine trusts. `build-apt-repo.sh` builds one into `docs/apt/`, which GitHub
-Pages can serve directly from the `main` branch (Settings → Pages → Source:
-main, folder `/docs`).
-
-Once, to publish:
+To publish:
 
 ```sh
 gpg --quick-generate-key "Your Name <you@example.com>" default default 5y
-gpg --list-secret-keys --keyid-format long     # the id after "sec ... /"
+gpg --list-secret-keys --keyid-format long      # the id after "sec .../"
 AGENT_USAGE_GPG_KEY=<that id> ./build-apt-repo.sh
 git add docs/apt && git commit -m "publish 1.0.0" && git push
 ```
 
-The signature is the point of the key: it is how apt knows the package came
-from you and not from whoever else could reach the host. Skip it and every
-user has to write `[trusted=yes]` in their source line, which switches that
-check off.
+The script signs only with the key `AGENT_USAGE_GPG_KEY` names, and publishes
+its public half, name and email included, as `docs/apt/agent-usage.asc`. Use a
+key made for this. Without a signature, users would have to mark the source
+`[trusted=yes]`, which turns off apt's check that the package came from you.
 
-The script signs only with the key `AGENT_USAGE_GPG_KEY` names, never the
-first one in the keyring: the signing key's public half, with its name and
-email, is published in `docs/apt/agent-usage.asc`. Use a key made for this.
-
-Then each user adds the source once. The address below is an example built
-from this repository's own name: nothing is published there, and the commands
-only work once you have run the steps above against a repository of your own.
+Each user then adds the source. The address below follows this repository's
+name as an example; nothing is published there.
 
 ```sh
 sudo install -d /etc/apt/keyrings
@@ -104,11 +61,34 @@ echo "deb [signed-by=/etc/apt/keyrings/agent-usage.asc] https://pgiahuy.github.i
 sudo apt update && sudo apt install agent-usage
 ```
 
-Shipping a new version is `VERSION=1.1.0 ./build-apt-repo.sh` and another
-commit. Note that the repository URL must not contain spaces: apt splits
-`sources.list` lines on whitespace, so a path with one in it fails with a
-confusing "Release file not found".
+To publish a new version, run `build-apt-repo.sh` again and commit. The
+repository URL must not contain spaces: apt splits `sources.list` lines on
+whitespace, and fails with "Release file not found".
 
-The other route is a Launchpad PPA, which builds from source you upload and
-gives Ubuntu users `add-apt-repository ppa:you/agent-usage`. It needs a Launchpad
-account and a signed source upload; the `.deb` here is the same artifact.
+A Launchpad PPA is the other option. It builds from a signed source upload and
+needs a Launchpad account.
+
+## extensions.gnome.org
+
+The store takes a zip and compiles the schema itself, which is why
+`gschemas.compiled` is not in the repository:
+
+```sh
+cd extension
+gnome-extensions pack . \
+  --extra-source="$(basename "$(ls ui-*.js | sort -V | tail -1)")" \
+  --extra-source=prefs.js \
+  --schema=schemas/org.gnome.shell.extensions.agent-usage.gschema.xml
+```
+
+Two things to settle before submitting:
+
+- **The loader.** `extension.js` imports whichever `ui-<n>.js` has the highest
+  number, which is what lets `install.sh` upgrade without a logout. The review
+  guidelines say nothing about a dynamic import of a computed path, so whether
+  review accepts it is not known. A static import of a single `ui.js` would
+  settle the question, at the cost of a logout on every upgrade. Issue #19
+  tracks the decision.
+- **`shell-version`** must list every GNOME Shell version you intend to
+  support. The store offers the extension only to those, and the shell refuses
+  it on any other.
