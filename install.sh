@@ -163,7 +163,10 @@ if [ "$with_service" -eq 1 ]; then
   install -m 644 "$SRC/systemd/agent-usage.service" "$UNIT_DIR/agent-usage.service"
   if command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload
-    systemctl --user enable --now agent-usage.service
+    systemctl --user enable agent-usage.service
+    # restart, not start: a collector already running keeps the code it loaded
+    # when it started, so an upgrade has to replace it.
+    systemctl --user restart agent-usage.service
     say "service:   $(systemctl --user is-active agent-usage.service)"
   else
     say "service:   systemd not found; run 'agent-usage --daemon' yourself"
