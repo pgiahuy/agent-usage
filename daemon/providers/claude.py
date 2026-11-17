@@ -145,11 +145,16 @@ def _run_briefly(argv, limit):
         return False
 
 
-def renew():
+def renew(rejected=None):
     """Have Claude Code renew its own token, so nothing here acts as Claude Code.
 
     `auth status` costs nothing; if it leaves the token expired, one minimal
     prompt does it, without tools, MCP servers or a saved session.
+
+    rejected is a token the server refused before it expired. The copy on disk
+    still looks valid then, so it counts as renewed only once it is a
+    different token, which in practice means the prompt: it is the attempt
+    that makes a request and meets the refusal.
     """
     cli = _find_cli()
     if cli is None:
@@ -167,7 +172,8 @@ def renew():
             return "renew timed out"
         if not _run_briefly(argv, left):
             continue
-        if token()[0]:
+        tok = token()[0]
+        if tok and tok != rejected:
             return None
     return "renew failed"
 
