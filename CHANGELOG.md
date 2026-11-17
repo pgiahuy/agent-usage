@@ -33,7 +33,13 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
   under Kimi's own lock and never while a `kimi` process runs, with the result
   written back to its credentials file; Claude is left to renew its own, via
   `claude auth status` and at most one minimal `claude -p` prompt. The timed
-  loop still never touches a token.
+  loop still never touches a token. A Claude token the server refuses before
+  it has expired is renewed too, once, and the request retried only if the
+  token was actually replaced; a refused Kimi token is left to expire, which
+  takes at most fifteen minutes.
+- Each agent's header in the popup says how old its quota figures are:
+  `checked 4m ago`. The figures are fetched every few minutes while the panel
+  is redrawn every 20 seconds, so without it a stale figure looked current.
 - An agent that is not installed is left out of the panel entirely, rather
   than drawn as an empty block.
 - `tools/doctor.sh`, a read-only check that says why the panel indicator is
@@ -53,6 +59,13 @@ Everything below has landed on `main` since 1.0.0 and is not in a release yet.
 
 ### Fixed
 
+- Two gaps in deduplicating the session logs, neither seen in practice: a
+  Kimi turn that differed from another only in cache writes was dropped, and
+  a Claude record with neither a message id nor a request id was counted again
+  each time a resumed session replayed it.
+- A failed request's reason is the reason alone: `connection refused`, not
+  `[Errno 111] Connection refused`. A failure from a file, such as Kimi's
+  credentials during a Refresh, no longer puts the file's path in the popup.
 - The popup was close to unreadable when the shell used its light style, which
   is the default on Ubuntu: the figures, labels, tiles, bar tracks and
   separator were all drawn for a dark background, and the figures fell to
