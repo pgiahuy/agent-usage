@@ -1,24 +1,9 @@
-## What this changes
-
-<!-- One or two sentences. Why the change is right, not what the diff says. -->
+<!-- What this changes and why, in a few sentences. -->
 
 Closes #
 
-## What I ran
+- [ ] The checks in CONTRIBUTING.md pass
+- [ ] Ran `./install.sh` and looked at the panel, if this changes it
+- [ ] Added a test, if this changes the collector
 
-- [ ] `python3 -m unittest discover -s tests`
-- [ ] `ruff check daemon tests`
-- [ ] `shellcheck install.sh uninstall.sh build-deb.sh build-apt-repo.sh tools/doctor.sh bin/agent-usage.in`
-- [ ] `./install.sh` and looked at the real panel
-- [ ] Added or updated a test, if this touches the collector
-
-## Anything you are unsure about
-
-<!-- Decisions worth a second opinion. Say so rather than hiding it. -->
-
-## Checklist
-
-- [ ] One concern per commit, subject in the imperative and lowercase
-- [ ] No em-dashes, in code, comments, docs or commit messages
-- [ ] No number is shown that a provider did not give
-- [ ] Documentation updated if behaviour or a setting changed
+<!-- Anything you are unsure about. -->
