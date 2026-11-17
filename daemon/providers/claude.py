@@ -56,19 +56,21 @@ def extract(raw):
         epoch = datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
+    inp = int(u.get("input_tokens") or 0)
+    out = int(u.get("output_tokens") or 0)
+    cread = int(u.get("cache_read_input_tokens") or 0)
+    cwrite = int(u.get("cache_creation_input_tokens") or 0)
     # A resumed or forked session replays earlier messages into the new file;
-    # message id + request id identify a reply however often it is copied.
+    # message id + request id identify a reply however often it is copied. A
+    # record with neither is keyed on its own contents instead, which a replay
+    # copies byte for byte. That key is a tuple, so it can never equal an id
+    # key, which is always a string.
     mid, rid = msg.get("id"), d.get("requestId")
-    key = "%s|%s" % (mid or "", rid or "") if (mid or rid) else None
-    return (
-        epoch,
-        model,
-        key,
-        int(u.get("input_tokens") or 0),
-        int(u.get("output_tokens") or 0),
-        int(u.get("cache_read_input_tokens") or 0),
-        int(u.get("cache_creation_input_tokens") or 0),
-    )
+    if mid or rid:
+        key = "%s|%s" % (mid or "", rid or "")
+    else:
+        key = (ts, model, inp, out, cread, cwrite)
+    return (epoch, model, key, inp, out, cread, cwrite)
 
 
 def token():

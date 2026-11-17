@@ -83,6 +83,15 @@ class ScannerTest(unittest.TestCase):
         summary = scan.summarize(self.scanner.scan())
         self.assertEqual(summary["week"]["total"]["reqs"], 0)
 
+    def test_a_claude_record_with_no_ids_still_counts_once(self):
+        # The same bytes twice, as a resumed session replays them.
+        line = claude_line(None, None)
+        self.append(line + line)
+        self.assertEqual(self.today()["reqs"], 1)
+        # A different record with no ids is a different reply.
+        self.append(claude_line(None, None, out=21))
+        self.assertEqual(self.today()["reqs"], 2)
+
     def test_kimi_turns_differing_only_in_cache_writes_both_count(self):
         scanner = scan.Scanner(os.path.join(self.dir, "*.jsonl"), kimi.extract)
         ms = int(time.time() * 1000)
