@@ -157,7 +157,8 @@ copy the installed `ui-<n>.js` to `ui-<n+1>.js`, edit that, and toggle:
 
 ```sh
 cd ~/.local/share/gnome-shell/extensions/agent-usage@pgiahuy.github.io
-cp ui-6.js ui-7.js && $EDITOR ui-7.js
+n=$(ls ui-*.js | tr -dc '0-9\n' | sort -n | tail -1)
+cp "ui-$n.js" "ui-$((n + 1)).js" && $EDITOR "ui-$((n + 1)).js"
 gnome-extensions disable agent-usage@pgiahuy.github.io
 gnome-extensions enable agent-usage@pgiahuy.github.io
 ```
