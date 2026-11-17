@@ -4,17 +4,7 @@ Notable changes per release. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Changed
-
-- Renamed from `ai-usage` to `agent-usage`: the command, the extension UUID,
-  the service, the package and the cache directory. A 1.0.0 install is not
-  upgraded in place; remove it with its own `uninstall.sh`.
-- Running `install.sh` again upgrades without a logout in most cases.
-- The AppIndicator tray (`--tray`) is gone. The extension and the terminal
-  view cover it.
-- The collector is split into modules, with one provider module per agent.
+## [Unreleased]
 
 ### Added
 
@@ -22,36 +12,44 @@ Notable changes per release. The format follows
   show, the popup layout (tiles, compact or large numbers) and the panel style.
 - Refresh renews an expired token, and a Claude token the server refuses
   before it expires. Kimi is refreshed under its own lock and never while
-  `kimi` runs; Claude Code renews its own. The timed loop never touches a
-  token.
+  `kimi` runs; Claude Code renews its own.
 - Each agent's header shows how old its quota figures are.
 - Agents that are not installed are left out.
 - `tools/doctor.sh`, a read-only check of why the indicator is missing, also
   shipped in the `.deb`.
-- Tests and CI, a contributing guide, a security policy, a code of conduct, and
-  issue and pull request templates.
+
+### Changed
+
+- Renamed from `ai-usage` to `agent-usage`: the command, the extension UUID,
+  the service, the package and the cache directory. A 1.0.0 install is not
+  upgraded in place; remove it with its own `uninstall.sh`.
+- Running `install.sh` again upgrades without a logout in most cases.
+- Failure reasons are shorter: `connection refused`, not
+  `[Errno 111] Connection refused`.
+
+### Removed
+
+- The AppIndicator tray, `--tray`. The extension and the terminal view cover it.
 
 ### Fixed
 
 - The popup was close to unreadable under the shell's light style, the default
   on Ubuntu.
-- A usage window that had already reset kept showing its old percentage as
-  current.
-- On Python 3.8 to 3.10, a reset time ending in `Z` was not parsed: no reset
-  time was shown, and a window that had reset kept its old percentage.
-- One unreadable line in a session log stopped the panel updating for as long
+- Running `install.sh` again did not restart the collector, which kept running
+  the old code until the next login.
+- When quota could not be fetched, a window that had already reset kept its old
+  percentage, unmarked in the panel.
+- One log line of an unexpected shape stopped the panel updating for as long
   as the line stayed in the log.
 - A log file replaced in place, at the same size or larger, lost its records.
 - A malformed cached reading stopped the panel updating.
-- A malformed state file broke the popup until the extension was restarted.
+- A malformed state file left the popup empty until the next valid one.
 - An unexpected error from a quota check crashed the collector, which then
   restarted every five seconds.
 - The 429 backoff stayed at 60 seconds instead of doubling up to 15 minutes.
 - Two rare deduplication gaps: a Kimi turn that differed from another only in
   cache writes was dropped, and a Claude record with no ids was counted again
   when its session was resumed.
-- Failure reasons are shorter: `connection refused`, not
-  `[Errno 111] Connection refused`.
 - The installer did not warn when GNOME Shell was newer than the extension
   supports, or when user extensions were switched off.
 
@@ -61,6 +59,9 @@ Notable changes per release. The format follows
   token to another host.
 - The cache directory is private to the user, and only the usage part of
   Kimi's reply is cached, without its account and billing identifiers.
+- `build-apt-repo.sh` signs only with the key `AGENT_USAGE_GPG_KEY` names.
+  1.0.0 fell back to the first secret key in the keyring and published its
+  public half.
 
 ## [1.0.0] - 2026-08-13
 
@@ -84,4 +85,5 @@ First release, under the name `ai-usage`.
 - A per-user installer, a `.deb` for system-wide installs, and a builder for a
   signed APT repository.
 
+[Unreleased]: https://github.com/pgiahuy/agent-usage/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/pgiahuy/agent-usage/releases/tag/v1.0.0
